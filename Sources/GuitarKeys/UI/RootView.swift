@@ -83,44 +83,8 @@ struct RootView: View {
     private func savedOverlay(_ url: URL) -> some View {
         VStack {
             Spacer()
-            HStack(spacing: 12) {
-                Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 17))
-                    .foregroundStyle(Theme.record)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Записано")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    Text(url.lastPathComponent)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Button(state.isPlayingBack ? "Стоп" : "Прослушать") {
-                    state.togglePlayback()
-                }
-                .buttonStyle(.glass)
-                .controlSize(.small)
-
-                Button("Показать") { state.revealLastRecording() }
-                    .buttonStyle(.glass)
-                    .controlSize(.small)
-
-                Button {
-                    withAnimation(.easeOut(duration: 0.25)) { state.recordingNotice = nil }
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
-                }
-                .buttonStyle(.plain)
-                .focusEffectDisabled()
-                .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 12)
-            .glassEffect(.regular.tint(Theme.record.opacity(0.16)), in: .capsule)
-            .padding(.bottom, 40)
+            RecordingNotice(url: url)
+                .padding(.bottom, 40)
         }
         .transition(.opacity.combined(with: .move(edge: .bottom)))
         .animation(.spring(response: 0.32, dampingFraction: 0.82), value: state.recordingNotice)

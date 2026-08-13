@@ -128,7 +128,7 @@ struct PadInspector: View {
             }
         }
         .padding(22)
-        .frame(width: 420)
+        .frame(minWidth: 300, idealWidth: 420, maxWidth: 460)
         .onChange(of: currentSource) { _, newValue in
             state.updatePad(pad, source: newValue)
         }

@@ -97,7 +97,7 @@ final class AppState {
         }
 
         if let pad = preferences.pad(for: code) {
-            press(pad: pad, accented: modifiers.contains(.shift))
+            pressPad(pad, accented: modifiers.contains(.shift))
             return true
         }
 
@@ -116,13 +116,14 @@ final class AppState {
 
     func handleKeyUp(_ code: UInt16) -> Bool {
         guard let pad = preferences.pad(for: code) else { return false }
-        release(pad: pad)
+        releasePad(pad)
         return true
     }
 
     // MARK: Игра
 
-    private func press(pad: Pad, accented: Bool) {
+    /// Аккорд взят: клавишей на маке или пальцем на телефоне.
+    func pressPad(_ pad: Pad, accented: Bool = false) {
         heldPads.removeAll { $0 == pad.id }
         heldPads.append(pad.id)
 
@@ -138,7 +139,8 @@ final class AppState {
         }
     }
 
-    private func release(pad: Pad) {
+    /// Аккорд отпущен.
+    func releasePad(_ pad: Pad) {
         heldPads.removeAll { $0 == pad.id }
 
         if let previous = heldPads.last,

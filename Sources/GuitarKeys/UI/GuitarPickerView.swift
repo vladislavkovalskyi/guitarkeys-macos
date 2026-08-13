@@ -59,7 +59,7 @@ struct GuitarPickerView: View {
             }
         }
         .padding(20)
-        .frame(width: 340)
+        .frame(minWidth: 300, idealWidth: 340, maxWidth: 420)
     }
 
     private func card(_ kind: GuitarModel.Kind) -> some View {

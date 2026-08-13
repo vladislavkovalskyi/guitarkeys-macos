@@ -44,7 +44,7 @@ struct GuitarKeysApp: App {
         }
         #else
         WindowGroup {
-            RootView()
+            TouchRootView()
                 .environment(state)
         }
         #endif
