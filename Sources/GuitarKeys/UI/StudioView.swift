@@ -1,54 +1,36 @@
 import SwiftUI
 
-/// Чем рисуем по сетке.
-enum StudioBrush: Hashable {
-    case strum(direction: StrumDirection, muted: Bool)
-    case pluck(string: Int)
-    /// Нота табулатуры: струну задаёт строка, лад — степпер.
-    case note
-    case eraser
-
-    var isNote: Bool { self == .note }
-}
-
-/// Творческая студия: проект собирается из тактов, в каждом восемь восьмых.
-/// Такт показывается либо строкой боя, либо табулатурой на шесть струн.
+/// Творческая студия: таймлайн проекта, кисти и транспорт.
+/// Сетка настраивается — размер такта и дробление доли задаются в шапке.
 struct StudioView: View {
     @Environment(AppState.self) private var state
-
-    @UIState private var brush: StudioBrush = .strum(direction: .down, muted: false)
-    @UIState private var brushVelocity: Double = 1.0
-    @UIState private var brushFret: Int = 0
 
     let compact: Bool
 
     var body: some View {
-        VStack(spacing: compact ? 8 : 12) {
+        VStack(spacing: compact ? 8 : 10) {
             transport
             brushBar
 
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(Array(state.song.bars.enumerated()), id: \.element.id) { index, bar in
-                        StudioBarRow(index: index,
-                                     bar: bar,
-                                     brush: brush,
-                                     brushVelocity: brushVelocity,
-                                     brushFret: brushFret,
-                                     compact: compact)
-                    }
+            StudioTimeline(brush: state.brush,
+                           brushVelocity: state.brushVelocity,
+                           brushFret: state.brushFret,
+                           cellWidth: state.timelineZoom,
+                           showsTabs: state.showsTabs,
+                           compact: compact)
+                .frame(maxHeight: .infinity, alignment: .top)
 
-                    Button {
-                        state.addBar()
-                    } label: {
-                        Label("Добавить такт", systemImage: "plus")
-                            .font(.system(size: 12, weight: .medium))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 38)
-                    }
-                    .buttonStyle(.glass)
+            HStack(spacing: 8) {
+                Button { state.addBar() } label: {
+                    Label("Такт", systemImage: "plus")
+                        .font(.system(size: 11, weight: .medium))
+                        .padding(.horizontal, 10)
+                        .frame(height: 30)
                 }
-                .padding(.bottom, 8)
+                .buttonStyle(.glass)
+
+                if !compact { shortcutHints }
+                Spacer(minLength: 0)
             }
         }
     }
@@ -85,11 +67,34 @@ struct StudioView: View {
                     .frame(width: 34, height: 34)
             }
             .buttonStyle(.glass)
-            .help("Повторять по кругу")
+            .help("Повторять по кругу (L)")
 
-            stepper(value: Int(state.song.bpm), caption: "темп",
-                    minus: { state.song.bpm = max(40, state.song.bpm - 2) },
-                    plus: { state.song.bpm = min(220, state.song.bpm + 2) })
+            stepper(value: "\(Int(state.song.bpm))", caption: "темп",
+                    minus: { state.song.bpm = max(40, state.song.bpm - 1) },
+                    plus: { state.song.bpm = min(220, state.song.bpm + 1) })
+
+            // Размер такта и дробление — сетка перестраивается на лету.
+            stepper(value: "\(state.song.beatsPerBar)/4", caption: "размер",
+                    minus: { state.setBeatsPerBar(state.song.beatsPerBar - 1) },
+                    plus: { state.setBeatsPerBar(state.song.beatsPerBar + 1) })
+
+            Menu {
+                ForEach(Division.allCases) { division in
+                    Button(division.title) { state.setDivision(division) }
+                }
+            } label: {
+                VStack(spacing: 0) {
+                    Text(state.song.division.title)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.accent)
+                    Text("сетка").font(.system(size: 8)).foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 8)
+                .frame(height: 34)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .glassEffect(.regular.interactive(), in: .capsule)
 
             if !compact {
                 Text(durationLabel)
@@ -144,7 +149,7 @@ struct StudioView: View {
                       Int(total) / 60, Int(total) % 60)
     }
 
-    private func stepper(value: Int, caption: String,
+    private func stepper(value: String, caption: String,
                          minus: @escaping () -> Void, plus: @escaping () -> Void) -> some View {
         HStack(spacing: 3) {
             Button(action: minus) {
@@ -155,13 +160,13 @@ struct StudioView: View {
             .focusEffectDisabled()
 
             VStack(spacing: 0) {
-                Text("\(value)")
+                Text(value)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(Theme.accent)
                 Text(caption).font(.system(size: 8)).foregroundStyle(.tertiary)
             }
-            .frame(minWidth: 30)
+            .frame(minWidth: 32)
 
             Button(action: plus) {
                 Image(systemName: "plus").font(.system(size: 9, weight: .bold))
@@ -177,13 +182,15 @@ struct StudioView: View {
     // MARK: Кисть
 
     private var brushBar: some View {
-        VStack(spacing: 6) {
+        @Bindable var state = state
+
+        return VStack(spacing: 6) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 5) {
-                    brushChip(.strum(direction: .down, muted: false), symbol: "arrow.down")
-                    brushChip(.strum(direction: .up, muted: false), symbol: "arrow.up")
-                    brushChip(.strum(direction: .down, muted: true), symbol: "arrow.down.to.line")
-                    brushChip(.strum(direction: .up, muted: true), symbol: "arrow.up.to.line")
+                    brushChip(.strum(direction: .down, muted: false), symbol: "arrow.down", hint: "1")
+                    brushChip(.strum(direction: .up, muted: false), symbol: "arrow.up", hint: "2")
+                    brushChip(.strum(direction: .down, muted: true), symbol: "arrow.down.to.line", hint: "3")
+                    brushChip(.strum(direction: .up, muted: true), symbol: "arrow.up.to.line", hint: "4")
 
                     divider
 
@@ -193,39 +200,52 @@ struct StudioView: View {
 
                     divider
 
-                    brushChip(.note, symbol: "number", label: "лад")
-                    brushChip(.eraser, symbol: "eraser")
+                    brushChip(.note, symbol: "number", label: "лад", hint: "5")
+                    brushChip(.eraser, symbol: "eraser", hint: "6")
                 }
                 .padding(.vertical, 2)
             }
 
-            HStack(spacing: 12) {
-                if brush.isNote {
-                    stepper(value: brushFret, caption: "лад",
-                            minus: { brushFret = max(0, brushFret - 1) },
-                            plus: { brushFret = min(24, brushFret + 1) })
+            HStack(spacing: 10) {
+                if state.brush.isNote {
+                    stepper(value: "\(state.brushFret)", caption: "лад",
+                            minus: { state.brushFret = max(0, state.brushFret - 1) },
+                            plus: { state.brushFret = min(24, state.brushFret + 1) })
                 }
 
-                HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     Image(systemName: "speaker.wave.2")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
-                    Slider(value: $brushVelocity, in: 0.25...1.4)
+                    Slider(value: $state.brushVelocity, in: 0.25...1.4)
                         .controlSize(.small)
                         .tint(Theme.accent)
-                        .frame(maxWidth: 190)
-                    Text("\(Int(brushVelocity * 100))%")
+                        .frame(maxWidth: 150)
+                    Text("\(Int(state.brushVelocity * 100))%")
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
-                        .frame(width: 38, alignment: .trailing)
+                        .frame(width: 36, alignment: .trailing)
                 }
 
-                if !compact {
-                    Text("сила удара · тяните по ячейке вверх-вниз")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tertiary)
+                Toggle("табы", isOn: $state.showsTabs)
+                    .toggleStyle(.button)
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .help("Показать табулатуру (T)")
+
+                HStack(spacing: 4) {
+                    Image(systemName: "minus.magnifyingglass")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Slider(value: $state.timelineZoom, in: 16...64)
+                        .controlSize(.small)
+                        .tint(Theme.accent)
+                        .frame(maxWidth: 90)
                 }
+                .help("Масштаб таймлайна ([ ])")
+
                 Spacer(minLength: 0)
             }
         }
@@ -235,15 +255,16 @@ struct StudioView: View {
         Rectangle().fill(Color.white.opacity(0.12)).frame(width: 1, height: 20)
     }
 
-    private func brushChip(_ value: StudioBrush, symbol: String?, label: String? = nil) -> some View {
-        let selected = brush == value
+    private func brushChip(_ value: StudioBrush, symbol: String?,
+                           label: String? = nil, hint: String? = nil) -> some View {
+        let selected = state.brush == value
         let muted: Bool = {
             if case .strum(_, let isMuted) = value { return isMuted }
             return false
         }()
 
         return Button {
-            brush = value
+            state.brush = value
         } label: {
             HStack(spacing: 3) {
                 if let symbol {
@@ -264,6 +285,22 @@ struct StudioView: View {
         .background {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(selected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.quaternary))
+        }
+        .help(hint.map { "\(value.title) (\($0))" } ?? value.title)
+    }
+
+    private var shortcutHints: some View {
+        HStack(spacing: 10) {
+            ForEach(AppState.studioShortcuts.prefix(7), id: \.keys) { shortcut in
+                HStack(spacing: 3) {
+                    Text(shortcut.keys)
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.accent.opacity(0.9))
+                    Text(shortcut.action)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                }
+            }
         }
     }
 }

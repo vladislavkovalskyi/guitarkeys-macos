@@ -14,11 +14,14 @@ enum SongRenderer {
         var events: [StringEvent] = []
         var previousChord: Chord?
         let slotSamples = song.slotDuration * sampleRate
+        // Такты считаем накопительно: их длина зависит от сетки и может отличаться.
+        var slotCursor = 0
 
         for (barIndex, bar) in song.bars.enumerated() {
+            defer { slotCursor += bar.slotCount }
             guard let chord = song.chord(inBar: barIndex) else { continue }
             let voicing = ChordLibrary.voicing(for: chord)
-            let barStart = Double(barIndex * Bar.slotCount) * slotSamples
+            let barStart = Double(slotCursor) * slotSamples
 
             // Смена аппликатуры глушит то, что звенело от прошлого аккорда.
             if let previous = previousChord, previous != chord {

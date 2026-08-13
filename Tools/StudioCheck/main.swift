@@ -133,6 +133,44 @@ do {
     check(independent, "смена аккорда такта не трогает ноты табулатуры")
 }
 
+print("\nПеребор по аккорду:")
+do {
+    var arp = Song()
+    arp.bpm = 120
+    arp.key = MusicalKey(tonic: 9, scale: .minor)
+    // Am по аппликатуре x02210: струны 5,4,3 дают A, E, A.
+    var bar = Bar(chord: .fixed(Chord(root: 9, quality: .minor)), view: .tab)
+    bar.slots[0] = [.pluck(string: 1)]
+    bar.slots[2] = [.pluck(string: 2)]
+    bar.slots[4] = [.pluck(string: 3)]
+    bar.slots[6] = [.pluck(string: 0)]   // шестая струна в Am заглушена
+    arp.bars = [bar]
+
+    let picked = SongRenderer.events(for: arp, model: .acoustic, sampleRate: sampleRate)
+        .filter { $0.kind == .pluck }
+        .sorted { $0.atSample < $1.atSample }
+
+    check(picked.count == 3, "заглушённая в аккорде струна молчит: \(picked.count) ноты из 4 поставленных")
+
+    let amVoicing = ChordLibrary.voicing(for: Chord(root: 9, quality: .minor))
+    let expected = [1, 2, 3].compactMap { amVoicing.midiNote(string: $0) }.map { Pitch.frequency(midi: Double($0)) }
+    let actual = picked.map { Double($0.frequency) }
+    let matches = zip(expected, actual).allSatisfy { abs(1200 * log2($1 / $0)) < 8 }
+    check(matches, "перебор звучит нотами аккорда: " + actual.map { String(format: "%.1f", $0) }.joined(separator: " "))
+
+    // Сменили аккорд — перебор обязан поехать за ним.
+    var moved = arp
+    moved.bars[0].chord = .fixed(Chord(root: 0, quality: .major))
+    let movedHz = SongRenderer.events(for: moved, model: .acoustic, sampleRate: sampleRate)
+        .filter { $0.kind == .pluck }
+        .sorted { $0.atSample < $1.atSample }
+        .map { Double($0.frequency) }
+    let cVoicing = ChordLibrary.voicing(for: Chord(root: 0, quality: .major))
+    let cExpected = [1, 2, 3].compactMap { cVoicing.midiNote(string: $0) }.map { Pitch.frequency(midi: Double($0)) }
+    let followed = zip(cExpected, movedHz).allSatisfy { abs(1200 * log2($1 / $0)) < 8 }
+    check(followed, "смена аккорда меняет ноты перебора: " + movedHz.map { String(format: "%.1f", $0) }.joined(separator: " "))
+}
+
 print("\nСила удара:")
 do {
     var loud = Song()
@@ -150,6 +188,48 @@ do {
     let quietPeak = peakVelocity(quiet)
     check(loudPeak > quietPeak * 1.8,
           String(format: "громкий удар сильнее тихого: %.2f против %.2f", loudPeak, quietPeak))
+}
+
+print("\nНастраиваемая сетка:")
+do {
+    var grid = Song()
+    grid.bpm = 120
+    check(grid.slotsPerBar == 8, "4/4 восьмыми — восемь делений в такте: \(grid.slotsPerBar)")
+    check(abs(grid.duration - 8.0) < 0.001, String(format: "длительность: %.2f с", grid.duration))
+
+    // Шестнадцатые: делений вдвое больше, а звучит такт столько же.
+    grid.division = .sixteenth
+    grid.normalizeBars()
+    check(grid.slotsPerBar == 16, "шестнадцатыми — шестнадцать делений: \(grid.slotsPerBar)")
+    check(grid.bars.allSatisfy { $0.slotCount == 16 }, "такты подогнаны под новую сетку")
+    check(abs(grid.duration - 8.0) < 0.001,
+          String(format: "такт звучит столько же: %.2f с", grid.duration))
+
+    // Вальс: три доли в такте.
+    var waltz = Song()
+    waltz.beatsPerBar = 3
+    waltz.normalizeBars()
+    check(waltz.slotsPerBar == 6, "3/4 восьмыми — шесть делений: \(waltz.slotsPerBar)")
+    check(waltz.bars.allSatisfy { $0.slotCount == 6 }, "такты вальса укоротились")
+
+    // Триоли.
+    var triplet = Song()
+    triplet.division = .triplet
+    triplet.normalizeBars()
+    check(triplet.slotsPerBar == 12, "триолями — двенадцать делений: \(triplet.slotsPerBar)")
+
+    // Сжатие такта не должно ломать раскладку.
+    let shrunk = SongRenderer.events(for: waltz, model: .acoustic, sampleRate: sampleRate)
+    check(!shrunk.isEmpty, "укороченный такт всё ещё играется: \(shrunk.count) щипков")
+
+    // Такты разной длины считаются накопительно, а не как индекс × длина.
+    var mixed = Song()
+    mixed.bars[0].resize(to: 4)
+    let mixedEvents = SongRenderer.events(for: mixed, model: .acoustic, sampleRate: sampleRate)
+        .sorted { $0.atSample < $1.atSample }
+    let secondBarStart = Double(mixed.bars[0].slotCount) * mixed.slotDuration
+    let firstOfSecondBar = mixedEvents.first { Double($0.atSample) / sampleRate > secondBarStart - 0.01 }
+    check(firstOfSecondBar != nil, "такты разной длины идут подряд без разрывов")
 }
 
 print("\nСохранение проекта:")

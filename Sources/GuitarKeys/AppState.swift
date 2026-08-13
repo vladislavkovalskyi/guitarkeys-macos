@@ -112,6 +112,9 @@ final class AppState {
             return true
         }
 
+        // В студии клавиатура сначала обслуживает редактор.
+        if screen == .studio, handleStudioKey(code, modifiers: modifiers) { return true }
+
         if let pad = preferences.pad(for: code) {
             pressPad(pad, accented: modifiers.contains(.shift))
             return true
@@ -464,6 +467,72 @@ final class AppState {
 
     // MARK: Студия
 
+    var brush: StudioBrush = .strum(direction: .down, muted: false)
+    var brushVelocity: Double = 1.0
+    var brushFret: Int = 0
+    var showsTabs = true
+    /// Ширина одного деления таймлайна — она же зум.
+    var timelineZoom: Double = 30
+
+    func setBeatsPerBar(_ beats: Int) {
+        song.beatsPerBar = max(1, min(12, beats))
+        song.normalizeBars()
+    }
+
+    func setDivision(_ division: Division) {
+        song.division = division
+        song.normalizeBars()
+    }
+
+    func zoom(by delta: Double) {
+        timelineZoom = max(16, min(64, timelineZoom + delta))
+    }
+
+    /// Горячие клавиши студии. Возвращает true, если нажатие обработано.
+    /// Всё, что не разобрали здесь, уходит обычной игре — чтобы можно было
+    /// подбирать на слух, не выходя из студии.
+    private func handleStudioKey(_ code: UInt16, modifiers: KeyModifiers) -> Bool {
+        switch code {
+        case KeyCodes.space:
+            toggleSongPlayback()
+        case KeyCodes.one:   brush = .strum(direction: .down, muted: false)
+        case KeyCodes.two:   brush = .strum(direction: .up, muted: false)
+        case KeyCodes.three: brush = .strum(direction: .down, muted: true)
+        case KeyCodes.four:  brush = .strum(direction: .up, muted: true)
+        case KeyCodes.five:  brush = .note
+        case KeyCodes.six:   brush = .eraser
+        case KeyCodes.l:     player.loops.toggle()
+        case KeyCodes.t:     showsTabs.toggle()
+        case KeyCodes.n:     addBar()
+        case KeyCodes.leftBracket:  zoom(by: -4)
+        case KeyCodes.rightBracket: zoom(by: +4)
+        case KeyCodes.comma:  song.bpm = max(40, song.bpm - (modifiers.contains(.shift) ? 10 : 1))
+        case KeyCodes.period: song.bpm = min(220, song.bpm + (modifiers.contains(.shift) ? 10 : 1))
+        case KeyCodes.arrowUp   where brush.isNote: brushFret = min(24, brushFret + 1)
+        case KeyCodes.arrowDown where brush.isNote: brushFret = max(0, brushFret - 1)
+        case KeyCodes.arrowRight: brushVelocity = min(1.4, brushVelocity + 0.05)
+        case KeyCodes.arrowLeft:  brushVelocity = max(0.25, brushVelocity - 0.05)
+        default:
+            return false
+        }
+        return true
+    }
+
+    /// Подписи горячих клавиш для подсказки в интерфейсе.
+    static let studioShortcuts: [(keys: String, action: String)] = [
+        ("␣", "играть / стоп"),
+        ("1…4", "удары"),
+        ("5", "лад"),
+        ("6", "ластик"),
+        ("←→", "сила кисти"),
+        ("↑↓", "номер лада"),
+        ("T", "табы"),
+        ("L", "повтор"),
+        ("N", "новый такт"),
+        (", .", "темп"),
+        ("[ ]", "масштаб"),
+    ]
+
     var song: Song {
         get { preferences.song }
         set { preferences.song = newValue }
@@ -611,7 +680,7 @@ final class AppState {
 
     func clearBar(at index: Int) {
         guard song.bars.indices.contains(index) else { return }
-        song.bars[index].slots = Array(repeating: [], count: Bar.slotCount)
+        song.bars[index].slots = Array(repeating: [], count: song.slotsPerBar)
     }
 
     // MARK: Сохранение и сведение

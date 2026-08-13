@@ -96,10 +96,33 @@ enum BarView: String, Codable, Hashable, Sendable, CaseIterable, Identifiable {
     var symbolName: String { self == .strum ? "arrow.up.arrow.down" : "tablecells" }
 }
 
-/// Такт: аккорд и восемь восьмых. На каждой доле может быть несколько событий —
+/// Как дробится доля.
+enum Division: Int, Codable, Hashable, Sendable, CaseIterable, Identifiable {
+    case quarter = 1      // четверти
+    case eighth = 2       // восьмые
+    case triplet = 3      // триоли
+    case sixteenth = 4    // шестнадцатые
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .quarter:   return "1/4"
+        case .eighth:    return "1/8"
+        case .triplet:   return "триоли"
+        case .sixteenth: return "1/16"
+        }
+    }
+
+    /// Через сколько делений приходится сильная доля.
+    var perBeat: Int { rawValue }
+}
+
+/// Такт: аккорд и сетка долей. На каждой доле может быть несколько событий —
 /// например, аккорд по табулатуре из нескольких струн сразу.
 struct Bar: Codable, Hashable, Identifiable, Sendable {
-    static let slotCount = 8
+    /// Сетка по умолчанию: 4/4 восьмыми.
+    static let defaultSlotCount = 8
 
     var id = UUID()
     var chord: PadSource
@@ -111,13 +134,21 @@ struct Bar: Codable, Hashable, Identifiable, Sendable {
         self.id = id
         self.chord = chord
         self.view = view
-        let given = slots ?? Array(repeating: [], count: Bar.slotCount)
-        self.slots = given.count == Bar.slotCount
-            ? given
-            : Array(repeating: [], count: Bar.slotCount)
+        self.slots = slots ?? Array(repeating: [], count: Bar.defaultSlotCount)
     }
 
+    var slotCount: Int { slots.count }
     var isEmpty: Bool { slots.allSatisfy(\.isEmpty) }
+
+    /// Подогнать такт под новую сетку, сохранив всё, что помещается.
+    mutating func resize(to count: Int) {
+        guard count > 0, count != slots.count else { return }
+        if count < slots.count {
+            slots = Array(slots.prefix(count))
+        } else {
+            slots += Array(repeating: [], count: count - slots.count)
+        }
+    }
 
     /// Удар на доле, если он там есть.
     func strumEvent(at slot: Int) -> StepEvent? {
@@ -139,12 +170,34 @@ struct Song: Codable, Hashable, Sendable {
     var key: MusicalKey = MusicalKey(tonic: 9, scale: .minor)
     var guitar: GuitarModel.Kind = .acoustic
     var humanize: Double = 0.55
+    /// Долей в такте: 4 — это 4/4, 3 — вальс.
+    var beatsPerBar: Int = 4
+    /// На сколько дробится доля.
+    var division: Division = .eighth
     var bars: [Bar] = Song.starter
 
-    /// Длительность восьмой в секундах.
-    var slotDuration: TimeInterval { 60.0 / bpm / 2 }
-    var totalSlots: Int { bars.count * Bar.slotCount }
+    /// Делений в такте при текущей сетке.
+    var slotsPerBar: Int { max(1, beatsPerBar * division.perBeat) }
+    /// Длительность одного деления в секундах.
+    var slotDuration: TimeInterval { 60.0 / bpm / Double(division.perBeat) }
+    var totalSlots: Int { bars.reduce(0) { $0 + $1.slotCount } }
     var duration: TimeInterval { Double(totalSlots) * slotDuration }
+
+    /// Сильная ли доля — по ней рисуются акценты сетки.
+    func isDownbeat(_ slot: Int) -> Bool { slot % division.perBeat == 0 }
+
+    /// Абсолютный номер деления от начала проекта.
+    func absoluteSlot(bar: Int, slot: Int) -> Int {
+        bars.prefix(bar).reduce(0) { $0 + $1.slotCount } + slot
+    }
+
+    /// Привести все такты к текущей сетке. Вызывается после смены размера.
+    mutating func normalizeBars() {
+        let target = slotsPerBar
+        for index in bars.indices {
+            bars[index].resize(to: target)
+        }
+    }
 
     func chord(inBar index: Int) -> Chord? {
         guard bars.indices.contains(index) else { return nil }
