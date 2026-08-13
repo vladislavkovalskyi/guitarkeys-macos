@@ -2,6 +2,15 @@ import AVFoundation
 import Observation
 import SwiftUI
 
+/// Экран приложения.
+enum AppScreen: String, Hashable, CaseIterable, Identifiable, Sendable {
+    case play, studio
+
+    var id: String { rawValue }
+    var title: String { self == .play ? "Игра" : "Студия" }
+    var symbolName: String { self == .play ? "guitars.fill" : "square.grid.3x2.fill" }
+}
+
 /// Что сейчас переназначаем.
 enum BindingTarget: Hashable {
     case pad(UUID)
@@ -32,12 +41,17 @@ final class AppState {
     private(set) var lastStrumMuted = false
     private(set) var strumTick = 0
 
+    var screen: AppScreen = .play {
+        didSet { if screen != .studio { player.stop() } }
+    }
     var bindingTarget: BindingTarget?
     var inspectorPad: Pad?
     var showsSettings = false
     var showsGuitarPicker = false
 
     private let audio = AudioEngine()
+    /// Проигрыватель проектов студии.
+    let player: SongPlayer
     #if os(macOS)
     private let keyboard = KeyboardMonitor()
     #endif
@@ -47,6 +61,8 @@ final class AppState {
     // MARK: Жизненный цикл
 
     init() {
+        player = SongPlayer(audio: audio)
+
         let prefs = PreferencesStore.load()
         preferences = prefs
         let chord = prefs.pads.first?.chord(in: prefs.key) ?? Chord(root: prefs.key.tonic, quality: .major)
@@ -339,7 +355,7 @@ final class AppState {
 
     private var recordingTimer: Timer?
     private var playbackTimer: Timer?
-    private var player: AVAudioPlayer?
+    private var previewPlayer: AVAudioPlayer?
 
     func toggleRecording() {
         isRecording ? stopRecording() : startRecording()
@@ -349,7 +365,7 @@ final class AppState {
         guard !isRecording else { return }
         stopPlayback()
         do {
-            try audio.startRecording()
+            try audio.startRecording(format: preferences.recordingFormat)
             isRecording = true
             recordingTime = 0
             recordingLevel = 0
@@ -403,7 +419,7 @@ final class AppState {
         do {
             let player = try AVAudioPlayer(contentsOf: url)
             player.play()
-            self.player = player
+            self.previewPlayer = player
             isPlayingBack = true
 
             // У AVAudioPlayer делегат требует NSObject, а опрос раз в пятую секунды
@@ -411,7 +427,7 @@ final class AppState {
             let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self else { return }
-                    if self.player?.isPlaying != true { self.stopPlayback() }
+                    if self.previewPlayer?.isPlaying != true { self.stopPlayback() }
                 }
             }
             RunLoop.main.add(timer, forMode: .common)
@@ -422,8 +438,8 @@ final class AppState {
     }
 
     func stopPlayback() {
-        player?.stop()
-        player = nil
+        previewPlayer?.stop()
+        previewPlayer = nil
         playbackTimer?.invalidate()
         playbackTimer = nil
         isPlayingBack = false
@@ -444,6 +460,222 @@ final class AppState {
     var recordingTimeText: String {
         let total = Int(recordingTime)
         return String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    // MARK: Студия
+
+    var song: Song {
+        get { preferences.song }
+        set { preferences.song = newValue }
+    }
+
+    /// Инструмент проекта — с учётом правок тембра, сделанных пользователем.
+    var songModel: GuitarModel {
+        preferences.guitars.first { $0.kind == song.guitar } ?? GuitarModel.preset(song.guitar)
+    }
+
+    var isSongPlaying: Bool { player.isPlaying }
+
+    func toggleSongPlayback() {
+        player.toggle(song, model: songModel)
+    }
+
+    func stopSongPlayback() {
+        player.stop()
+    }
+
+    private func valid(bar: Int, slot: Int) -> Bool {
+        song.bars.indices.contains(bar) && song.bars[bar].slots.indices.contains(slot)
+    }
+
+    /// Поставить или снять событие на доле. Повторный тап тем же — стирает.
+    func toggleSlot(bar: Int, slot: Int, event: StepEvent) {
+        guard valid(bar: bar, slot: slot) else { return }
+
+        if let index = song.bars[bar].slots[slot].firstIndex(where: { $0.matchesKind(of: event) }) {
+            song.bars[bar].slots[slot].remove(at: index)
+            return
+        }
+        // Удар на доле может быть только один: два одновременных взмаха невозможны.
+        if event.isStrum {
+            song.bars[bar].slots[slot].removeAll(where: \.isStrum)
+        }
+        song.bars[bar].slots[slot].append(event)
+        previewSlot(bar: bar, event: event)
+    }
+
+    /// Нота табулатуры: одна на струну и долю.
+    func setNote(bar: Int, slot: Int, string: Int, fret: Int, velocity: Double = 1) {
+        guard valid(bar: bar, slot: slot), (0...24).contains(fret) else { return }
+        song.bars[bar].slots[slot].removeAll { $0.string == string }
+        let event = StepEvent.note(string: string, fret: fret, velocity: velocity)
+        song.bars[bar].slots[slot].append(event)
+        previewSlot(bar: bar, event: event)
+    }
+
+    func clearNote(bar: Int, slot: Int, string: Int) {
+        guard valid(bar: bar, slot: slot) else { return }
+        song.bars[bar].slots[slot].removeAll { $0.string == string }
+    }
+
+    func clearSlot(bar: Int, slot: Int) {
+        guard valid(bar: bar, slot: slot) else { return }
+        song.bars[bar].slots[slot].removeAll()
+    }
+
+    /// Сила отдельного события — тише или с акцентом.
+    func setVelocity(bar: Int, slot: Int, eventID: UUID, velocity: Double) {
+        guard valid(bar: bar, slot: slot),
+              let index = song.bars[bar].slots[slot].firstIndex(where: { $0.id == eventID })
+        else { return }
+        song.bars[bar].slots[slot][index].velocity = max(0.25, min(1.4, velocity))
+    }
+
+    func setBarView(bar: Int, view: BarView) {
+        guard song.bars.indices.contains(bar) else { return }
+        song.bars[bar].view = view
+    }
+
+    /// Перетаскивание такта на новое место.
+    func moveBar(_ draggedID: UUID, before targetID: UUID) {
+        guard draggedID != targetID,
+              let from = song.bars.firstIndex(where: { $0.id == draggedID }),
+              let to = song.bars.firstIndex(where: { $0.id == targetID })
+        else { return }
+        withAnimation(.snappy(duration: 0.28)) {
+            let moved = song.bars.remove(at: from)
+            song.bars.insert(moved, at: to)
+        }
+    }
+
+    /// Дать услышать то, что только что поставили, — без запуска всего проекта.
+    private func previewSlot(bar: Int, event: StepEvent) {
+        guard !player.isPlaying, let chord = song.chord(inBar: bar) else { return }
+        let voicing = ChordLibrary.voicing(for: chord)
+        let previousModel = audio.model
+        audio.model = songModel
+        let force = Float(max(0.05, min(1.6, event.velocity)))
+
+        switch event.kind {
+        case .strum(let direction, let muted):
+            var articulation: StrumArticulation
+            switch (direction, muted) {
+            case (.down, false): articulation = .normalDown
+            case (.up, false):   articulation = .normalUp
+            case (.down, true):  articulation = .mutedDown
+            case (.up, true):    articulation = .mutedUp
+            }
+            articulation.velocity *= force
+            audio.strum(voicing: voicing, direction: direction, articulation: articulation)
+
+        case .pluck(let string):
+            var articulation = StrumArticulation.normalDown
+            articulation.velocity = 0.78 * force
+            audio.pluck(string: string, voicing: voicing, articulation: articulation)
+
+        case .note(let string, let fret):
+            var articulation = StrumArticulation.normalDown
+            articulation.velocity = 0.80 * force
+            if let note = StrumScheduler.note(string: string, fret: fret,
+                                              articulation: articulation,
+                                              model: songModel,
+                                              humanize: song.humanize,
+                                              origin: audio.currentSample &+ audio.scheduleLead) {
+                audio.queue(note)
+            }
+        }
+        audio.model = previousModel
+    }
+
+    func setBarChord(bar: Int, source: PadSource) {
+        guard song.bars.indices.contains(bar) else { return }
+        song.bars[bar].chord = source
+    }
+
+    func addBar() {
+        let source = song.bars.last?.chord ?? .degree(index: 0, seventh: false)
+        song.bars.append(Bar(chord: source, slots: song.bars.last?.slots))
+    }
+
+    func duplicateBar(at index: Int) {
+        guard song.bars.indices.contains(index) else { return }
+        var copy = song.bars[index]
+        copy.id = UUID()
+        song.bars.insert(copy, at: index + 1)
+    }
+
+    func removeBar(at index: Int) {
+        guard song.bars.count > 1, song.bars.indices.contains(index) else { return }
+        song.bars.remove(at: index)
+    }
+
+    func clearBar(at index: Int) {
+        guard song.bars.indices.contains(index) else { return }
+        song.bars[index].slots = Array(repeating: [], count: Bar.slotCount)
+    }
+
+    // MARK: Сохранение и сведение
+
+    var isExporting = false
+    var exportProgressLabel = ""
+    var exportNotice: URL?
+    var exportError: String?
+
+    func saveSongProject() {
+        do {
+            let url = try SongStore.save(song)
+            showExportNotice(url)
+        } catch {
+            exportError = error.localizedDescription
+        }
+    }
+
+    func loadSongProject(from url: URL) {
+        do {
+            player.stop()
+            song = try SongStore.load(from: url)
+        } catch {
+            exportError = error.localizedDescription
+        }
+    }
+
+    /// Сведение идёт быстрее реального времени и в стороне от главного потока,
+    /// иначе интерфейс замирал бы на всё время рендеринга.
+    func exportSong(format: AudioFileFormat) {
+        guard !isExporting else { return }
+        player.stop()
+        isExporting = true
+        exportProgressLabel = "Сведение в \(format.title)…"
+
+        let song = self.song
+        let model = self.songModel
+        let url = SongExporter.exportURL(for: song, format: format)
+
+        Task.detached(priority: .userInitiated) {
+            do {
+                let result = try SongExporter.export(song: song, model: model,
+                                                     to: url, format: format)
+                await MainActor.run {
+                    self.isExporting = false
+                    self.showExportNotice(result)
+                }
+            } catch {
+                await MainActor.run {
+                    self.isExporting = false
+                    self.exportError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func showExportNotice(_ url: URL) {
+        lastRecording = url
+        exportNotice = url
+        recordingNotice = url
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
+            guard let self, self.recordingNotice == url else { return }
+            withAnimation(.easeOut(duration: 0.3)) { self.recordingNotice = nil }
+        }
     }
 
     // MARK: Настройки звука

@@ -26,9 +26,13 @@ struct TouchRootView: View {
 
             VStack(spacing: compact ? 10 : 14) {
                 header(compact: compact)
-                TouchPadGrid(columns: columns, padHeight: padHeight)
-                FretboardView()
-                TouchStrumBar(height: strumHeight)
+                if state.screen == .studio {
+                    StudioView(compact: compact)
+                } else {
+                    TouchPadGrid(columns: columns, padHeight: padHeight)
+                    FretboardView()
+                    TouchStrumBar(height: strumHeight)
+                }
             }
             .padding(.horizontal, compact ? 12 : 20)
             .padding(.bottom, compact ? 8 : 16)
@@ -75,6 +79,7 @@ struct TouchRootView: View {
 
     private func header(compact: Bool) -> some View {
         HStack(spacing: 8) {
+            screenPicker
             keyStepper(compact: compact)
             if !compact { scaleToggle }
 
@@ -129,6 +134,31 @@ struct TouchRootView: View {
                     .allowsHitTesting(false)
             }
         }
+    }
+
+    /// Игра или студия — на телефоне только иконки, места на подписи нет.
+    private var screenPicker: some View {
+        HStack(spacing: 2) {
+            ForEach(AppScreen.allCases) { screen in
+                let selected = state.screen == screen
+                Button {
+                    state.screen = screen
+                    Haptics.pluck()
+                } label: {
+                    Image(systemName: screen.symbolName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(selected ? Color.black.opacity(0.82) : .secondary)
+                        .frame(width: 32, height: 28)
+                        .background {
+                            if selected { Capsule().fill(Theme.accent) }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(screen.title)
+            }
+        }
+        .padding(3)
+        .glassEffect(.regular.interactive(), in: .capsule)
     }
 
     private func keyStepper(compact: Bool) -> some View {

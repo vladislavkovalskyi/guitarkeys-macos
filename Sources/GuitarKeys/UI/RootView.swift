@@ -13,11 +13,17 @@ struct RootView: View {
             VStack(spacing: 0) {
                 HeaderView()
 
-                VStack(spacing: 16) {
-                    PadGridView()
-                    FretboardView()
-                    StrumDeckView()
-                    footer
+                Group {
+                    if state.screen == .studio {
+                        StudioView(compact: false)
+                    } else {
+                        VStack(spacing: 16) {
+                            PadGridView()
+                            FretboardView()
+                            StrumDeckView()
+                            footer
+                        }
+                    }
                 }
                 .padding(.horizontal, 22)
                 .padding(.bottom, 20)

@@ -8,13 +8,7 @@ struct HeaderView: View {
         @Bindable var state = state
 
         HStack(spacing: 14) {
-            HStack(spacing: 9) {
-                Image(systemName: "guitars.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-                Text("GuitarKeys")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-            }
+            screenPicker
 
             Spacer(minLength: 8)
 
@@ -64,6 +58,38 @@ struct HeaderView: View {
         .padding(.leading, 82)
         .padding(.trailing, 20)
         .padding(.vertical, 12)
+    }
+
+    /// Игра или студия. Заняло место заголовка: имя приложения и так в меню,
+    /// а переключатель нужен под рукой.
+    private var screenPicker: some View {
+        HStack(spacing: 2) {
+            ForEach(AppScreen.allCases) { screen in
+                let selected = state.screen == screen
+                Button {
+                    state.screen = screen
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: screen.symbolName)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(screen.title)
+                            .font(.system(size: 11, weight: selected ? .semibold : .regular,
+                                          design: .rounded))
+                    }
+                    .foregroundStyle(selected ? Color.black.opacity(0.82) : .secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background {
+                        if selected { Capsule().fill(Theme.accent) }
+                    }
+                }
+                .buttonStyle(.plain)
+                .focusEffectDisabled()
+            }
+        }
+        .padding(3)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .animation(.snappy(duration: 0.2), value: state.screen)
     }
 
     private var keyStepper: some View {

@@ -2,27 +2,6 @@ import AVFoundation
 import Foundation
 import Synchronization
 
-enum StrumDirection: String, Codable, Sendable {
-    case down   // от низких струн к высоким
-    case up     // от высоких к низким
-
-    var symbol: String { self == .down ? "arrow.down" : "arrow.up" }
-}
-
-/// Характер удара. Абсолютный тембр задаёт инструмент, здесь — только отклонения от него.
-struct StrumArticulation: Sendable {
-    var velocity: Float = 0.9
-    var brightnessOffset: Float = 0     // резче или мягче обычного
-    var sustainScale: Float = 1         // доля штатного затухания
-    var spreadMs: Double = 16           // задержка между соседними струнами
-    var muted: Bool = false             // глушение ладонью
-
-    static let normalDown = StrumArticulation(velocity: 0.90, brightnessOffset: 0.00, sustainScale: 1.00, spreadMs: 17)
-    static let normalUp   = StrumArticulation(velocity: 0.68, brightnessOffset: 0.06, sustainScale: 0.72, spreadMs: 11)
-    static let mutedDown  = StrumArticulation(velocity: 0.80, brightnessOffset: -0.18, sustainScale: 0.055, spreadMs: 9, muted: true)
-    static let mutedUp    = StrumArticulation(velocity: 0.62, brightnessOffset: -0.14, sustainScale: 0.048, spreadMs: 7, muted: true)
-}
-
 /// Обвязка AVAudioEngine: источник → эквалайзер корпуса → реверберация → выход.
 final class AudioEngine: @unchecked Sendable {
 
@@ -171,107 +150,47 @@ final class AudioEngine: @unchecked Sendable {
     }
 
     /// Бой по прижатому аккорду. Струны звучат последовательно — в этом и слышен «бой».
-    /// Каждый удар отличается от предыдущего: рука не автомат.
-    func strum(voicing: Voicing, direction: StrumDirection, articulation: StrumArticulation) {
-        let sounding = voicing.soundingStrings
-        guard !sounding.isEmpty else { return }
-
-        let human = Float(max(0, min(1, humanize)))
-        var order: [Int] = direction == .down ? sounding : sounding.reversed()
-
-        // Движение вверх начинается с тонких струн и часто не достаёт до басов.
-        if direction == .up && human > 0 && order.count > 3 {
-            if Float.random(in: 0...1) < 0.40 * human {
-                order.removeLast()
-                if order.count > 3 && Float.random(in: 0...1) < 0.30 * human {
-                    order.removeLast()
-                }
-            }
-        }
-
-        // Сила и скорость всего движения гуляют от удара к удару.
-        let strokeGain = 1 + Float.random(in: -0.11...0.11) * human
-        let spreadMs = articulation.spreadMs * (1 + Double.random(in: -0.22...0.22) * Double(human))
-        let origin = scheduleOrigin
-
-        for (position, stringIndex) in order.enumerated() {
-            guard let midi = voicing.midiNote(string: stringIndex) else { continue }
-
-            var velocity = articulation.velocity * strokeGain
-            if direction == .up {
-                // Медиатор входит в струны под углом: первые задеты полнее последних.
-                let depth = Float(position) / Float(max(1, order.count - 1))
-                velocity *= 0.55 + 0.45 * (1 - depth)
-            }
-            velocity *= 1 + Float.random(in: -0.19...0.19) * human
-
-            // Живая гитара не строит идеально: палец давит на лад каждый раз чуть иначе.
-            let detuneCents = Float.random(in: -3.0...3.0) * human
-            let frequency = Float(Pitch.frequency(midi: Double(midi))) * pow(2, detuneCents / 1200)
-
-            // Дрожание руки во времени — главное, что отличает игру от секвенсора.
-            let jitterMs = Double.random(in: -2.2...2.2) * Double(human)
-            let offsetMs = max(0, Double(position) * spreadMs + jitterMs)
-
-            var event = StringEvent()
-            event.atSample = origin &+ UInt64(offsetMs * sampleRate / 1000)
-            event.string = Int32(stringIndex)
-            event.frequency = frequency
-            event.velocity = min(1, max(0.04, velocity))
-            event.brightness = brightness(articulation: articulation, human: human)
-            event.pickPosition = pickPosition(human: human)
-            event.sustain = sustain(string: stringIndex, articulation: articulation, human: human)
-            event.kind = .pluck
-            synth.queue.push(event)
-        }
+    /// `at` задаёт точный момент в сэмплах; без него удар идёт сразу.
+    func strum(voicing: Voicing, direction: StrumDirection,
+               articulation: StrumArticulation, at: UInt64? = nil) {
+        let events = StrumScheduler.strum(voicing: voicing,
+                                          direction: direction,
+                                          articulation: articulation,
+                                          model: model,
+                                          humanize: humanize,
+                                          sampleRate: sampleRate,
+                                          origin: at ?? scheduleOrigin)
+        for event in events { synth.queue.push(event) }
     }
 
     /// Одиночная струна — для перебора.
-    func pluck(string: Int, voicing: Voicing, articulation: StrumArticulation) {
-        guard let midi = voicing.midiNote(string: string) else { return }
-        let human = Float(max(0, min(1, humanize)))
-        let detuneCents = Float.random(in: -3.0...3.0) * human
-
-        var event = StringEvent()
-        event.atSample = scheduleOrigin
-        event.string = Int32(string)
-        event.frequency = Float(Pitch.frequency(midi: Double(midi))) * pow(2, detuneCents / 1200)
-        event.velocity = min(1, articulation.velocity * (1 + Float.random(in: -0.15...0.15) * human))
-        event.brightness = brightness(articulation: articulation, human: human)
-        event.pickPosition = pickPosition(human: human)
-        event.sustain = sustain(string: string, articulation: articulation, human: human)
-        event.kind = .pluck
+    func pluck(string: Int, voicing: Voicing,
+               articulation: StrumArticulation, at: UInt64? = nil) {
+        guard let event = StrumScheduler.pluck(string: string,
+                                               voicing: voicing,
+                                               articulation: articulation,
+                                               model: model,
+                                               humanize: humanize,
+                                               origin: at ?? scheduleOrigin) else { return }
         synth.queue.push(event)
     }
 
-    private func brightness(articulation: StrumArticulation, human: Float) -> Float {
-        let jitter = Float.random(in: -0.09...0.09) * human
-        return max(0, min(1, Float(model.brightness) + articulation.brightnessOffset + jitter))
-    }
-
-    private func pickPosition(human: Float) -> Float {
-        // Рука не попадает дважды в одну точку струны.
-        let jitter = Float.random(in: -0.035...0.035) * human
-        return max(0.04, min(0.42, Float(model.pickPosition) + jitter))
-    }
-
-    private func sustain(string: Int, articulation: StrumArticulation, human: Float) -> Float {
-        let base = Float(model.sustain(forString: string)) * articulation.sustainScale
-        return max(0.03, base * (1 + Float.random(in: -0.10...0.10) * human))
-    }
-
     /// Приглушить все струны — палец снят с аккорда.
-    func dampAll(release: Float = 0.12) {
-        let origin = scheduleOrigin
-        for string in 0..<GuitarSynth.stringCount {
-            var event = StringEvent()
-            event.atSample = origin
-            event.string = Int32(string)
-            event.sustain = release
-            event.kind = .damp
+    func dampAll(release: Float = 0.12, at: UInt64? = nil) {
+        for event in StrumScheduler.damp(release: release, origin: at ?? scheduleOrigin) {
             synth.queue.push(event)
         }
     }
+
+    /// Поставить готовое событие в очередь: студия рассчитывает время сама.
+    func queue(_ event: StringEvent) {
+        synth.queue.push(event)
+    }
+
+    /// Текущее время аудиопотока — по нему студия расставляет доли.
+    var currentSample: UInt64 { synth.sampleClock.load(ordering: .relaxed) }
+    /// Запас, с которым безопасно планировать ближайшее событие.
+    var scheduleLead: UInt64 { scheduleLeadSamples }
 
     // MARK: - Запись
 
@@ -305,7 +224,7 @@ final class AudioEngine: @unchecked Sendable {
     /// Пишем с выходного микшера — в файл попадает ровно то, что слышно,
     /// вместе с корпусом и реверберацией.
     @discardableResult
-    func startRecording() throws -> URL {
+    func startRecording(format fileFormat: AudioFileFormat = .m4a) throws -> URL {
         recordingLock.lock()
         if let existing = recordingURL, recordingFile != nil {
             recordingLock.unlock()
@@ -315,14 +234,10 @@ final class AudioEngine: @unchecked Sendable {
 
         let mixer = engine.mainMixerNode
         let format = mixer.outputFormat(forBus: 0)
-        let url = try Self.makeRecordingURL()
+        let url = try Self.makeRecordingURL(extension: fileFormat.fileExtension)
 
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: format.sampleRate,
-            AVNumberOfChannelsKey: min(2, Int(format.channelCount)),
-            AVEncoderBitRateKey: 192_000,
-        ]
+        let settings = fileFormat.settings(sampleRate: format.sampleRate,
+                                           channels: min(2, Int(format.channelCount)))
         let file = try AVAudioFile(forWriting: url, settings: settings)
 
         recordingLock.lock()
@@ -387,14 +302,15 @@ final class AudioEngine: @unchecked Sendable {
         return base.appendingPathComponent("GuitarKeys", isDirectory: true)
     }
 
-    private static func makeRecordingURL() throws -> URL {
+    private static func makeRecordingURL(extension fileExtension: String) throws -> URL {
         let folder = recordingsFolder
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH-mm-ss"
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        return folder.appendingPathComponent("GuitarKeys \(formatter.string(from: Date())).m4a")
+        return folder.appendingPathComponent(
+            "GuitarKeys \(formatter.string(from: Date())).\(fileExtension)")
     }
 
     func silenceAll() {

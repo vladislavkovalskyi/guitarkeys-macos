@@ -82,6 +82,10 @@ struct Preferences: Codable, Sendable {
     /// Клавиши отдельных струн, по гитарной нумерации: первая — самая тонкая.
     var stringKeys: [UInt16] = Preferences.defaultStringKeys
     var selectedGuitar: GuitarModel.Kind = .acoustic
+    /// В каком формате писать живую игру.
+    var recordingFormat: AudioFileFormat = .m4a
+    /// Текущий проект студии, чтобы он не терялся между запусками.
+    var song: Song = Song()
     /// Правки тембра хранятся отдельно для каждого инструмента.
     var guitars: [GuitarModel] = GuitarModel.presets
 
@@ -116,6 +120,10 @@ struct Preferences: Codable, Sendable {
         if stringKeys.count != 6 { stringKeys = fallback.stringKeys }
         selectedGuitar = try container.decodeIfPresent(GuitarModel.Kind.self, forKey: .selectedGuitar) ?? fallback.selectedGuitar
         guitars = try container.decodeIfPresent([GuitarModel].self, forKey: .guitars) ?? fallback.guitars
+        recordingFormat = try container.decodeIfPresent(AudioFileFormat.self, forKey: .recordingFormat) ?? fallback.recordingFormat
+        // Проект читаем отдельно и мягко: его формат меняется чаще прочих настроек,
+        // и несовместимый проект не должен утаскивать за собой привязки клавиш.
+        song = ((try? container.decodeIfPresent(Song.self, forKey: .song)) ?? nil) ?? fallback.song
 
         // На случай, если в файле не хватает какого-то инструмента.
         for preset in GuitarModel.presets where !guitars.contains(where: { $0.kind == preset.kind }) {

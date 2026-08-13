@@ -56,6 +56,33 @@ struct SettingsView: View {
                 }
             }
 
+            group("Формат записи") {
+                HStack(spacing: 5) {
+                    ForEach(AudioFileFormat.allCases) { format in
+                        let selected = state.preferences.recordingFormat == format
+                        Button {
+                            state.preferences.recordingFormat = format
+                        } label: {
+                            Text(format.title)
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(selected ? Color.black.opacity(0.82) : .primary)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 26)
+                                .background {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(selected ? AnyShapeStyle(Theme.accent)
+                                                       : AnyShapeStyle(.quaternary))
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .focusEffectDisabled()
+                    }
+                }
+                Text(state.preferences.recordingFormat.subtitle)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+
             group("Клавиши струн") {
                 HStack(spacing: 5) {
                     ForEach(0..<6, id: \.self) { number in
