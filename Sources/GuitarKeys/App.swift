@@ -23,7 +23,14 @@ struct GuitarKeysApp: App {
         .commands {
             // Приложение — инструмент, а не редактор документов.
             CommandGroup(replacing: .newItem) {}
-            CommandGroup(replacing: .undoRedo) {}
+            CommandGroup(replacing: .undoRedo) {
+                Button("Отменить") { state.undo() }
+                    .keyboardShortcut("z", modifiers: .command)
+                    .disabled(!state.canUndo)
+                Button("Повторить") { state.redo() }
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+                    .disabled(!state.canRedo)
+            }
             CommandGroup(replacing: .pasteboard) {}
 
             CommandMenu("Игра") {

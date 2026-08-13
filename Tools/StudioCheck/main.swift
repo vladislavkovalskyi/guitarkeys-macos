@@ -232,6 +232,41 @@ do {
     check(firstOfSecondBar != nil, "такты разной длины идут подряд без разрывов")
 }
 
+print("\nГотовые бои:")
+do {
+    check(RhythmLibrary.all.count >= 10, "в библиотеке \(RhythmLibrary.all.count) рисунков")
+
+    // Каждый рисунок обязан ложиться в свою сетку и звучать.
+    var broken: [String] = []
+    for pattern in RhythmLibrary.all {
+        var test = Song()
+        test.beatsPerBar = pattern.beatsPerBar
+        test.division = pattern.division
+        test.normalizeBars()
+        guard pattern.slots.count == test.slotsPerBar else {
+            broken.append("\(pattern.name): \(pattern.slots.count) долей вместо \(test.slotsPerBar)")
+            continue
+        }
+        test.bars = [Bar(chord: .degree(index: 0, seventh: false), slots: pattern.slots)]
+        let sound = SongRenderer.events(for: test, model: .acoustic, sampleRate: sampleRate)
+            .filter { $0.kind == .pluck }
+        if sound.isEmpty { broken.append("\(pattern.name): не звучит") }
+    }
+    check(broken.isEmpty, "все рисунки укладываются в сетку и звучат")
+    for problem in broken.prefix(5) { print("      · \(problem)") }
+
+    // «Восьмёрка» — восемь движений руки за такт.
+    if let eight = RhythmLibrary.all.first(where: { $0.name == "Восьмёрка" }) {
+        let strokes = eight.slots.flatMap { $0 }.filter { $0.isStrum }.count
+        check(strokes == 8, "в «Восьмёрке» восемь ударов: \(strokes)")
+        let downs = eight.slots.flatMap { $0 }.filter {
+            if case .strum(let direction, _) = $0.kind { return direction == .down }
+            return false
+        }.count
+        check(downs == 4, "чередование вниз-вверх: \(downs) вниз из 8")
+    }
+}
+
 print("\nСохранение проекта:")
 do {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("test.guitarkeys")

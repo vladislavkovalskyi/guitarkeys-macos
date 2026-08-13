@@ -562,6 +562,7 @@ final class AppState {
     /// Поставить или снять событие на доле. Повторный тап тем же — стирает.
     func toggleSlot(bar: Int, slot: Int, event: StepEvent) {
         guard valid(bar: bar, slot: slot) else { return }
+        pushUndo()
 
         if let index = song.bars[bar].slots[slot].firstIndex(where: { $0.matchesKind(of: event) }) {
             song.bars[bar].slots[slot].remove(at: index)
@@ -578,6 +579,7 @@ final class AppState {
     /// Нота табулатуры: одна на струну и долю.
     func setNote(bar: Int, slot: Int, string: Int, fret: Int, velocity: Double = 1) {
         guard valid(bar: bar, slot: slot), (0...24).contains(fret) else { return }
+        pushUndo()
         song.bars[bar].slots[slot].removeAll { $0.string == string }
         let event = StepEvent.note(string: string, fret: fret, velocity: velocity)
         song.bars[bar].slots[slot].append(event)
@@ -586,11 +588,13 @@ final class AppState {
 
     func clearNote(bar: Int, slot: Int, string: Int) {
         guard valid(bar: bar, slot: slot) else { return }
+        pushUndo()
         song.bars[bar].slots[slot].removeAll { $0.string == string }
     }
 
     func clearSlot(bar: Int, slot: Int) {
         guard valid(bar: bar, slot: slot) else { return }
+        pushUndo()
         song.bars[bar].slots[slot].removeAll()
     }
 
@@ -609,6 +613,7 @@ final class AppState {
 
     /// Перетаскивание такта на новое место.
     func moveBar(_ draggedID: UUID, before targetID: UUID) {
+        pushUndo()
         guard draggedID != targetID,
               let from = song.bars.firstIndex(where: { $0.id == draggedID }),
               let to = song.bars.firstIndex(where: { $0.id == targetID })
@@ -658,17 +663,105 @@ final class AppState {
         audio.model = previousModel
     }
 
+    // MARK: Ритмические рисунки
+
+    /// Положить готовый бой в такт. Сетка при необходимости перестраивается:
+    /// «галоп» шестнадцатыми в восьмых просто не поместится.
+    func applyPattern(_ pattern: RhythmPattern, toBar index: Int) {
+        guard song.bars.indices.contains(index) else { return }
+        pushUndo()
+        adoptGrid(of: pattern)
+        song.bars[index].slots = fitted(pattern)
+    }
+
+    func applyPatternToAll(_ pattern: RhythmPattern) {
+        guard !song.bars.isEmpty else { return }
+        pushUndo()
+        adoptGrid(of: pattern)
+        let slots = fitted(pattern)
+        for index in song.bars.indices {
+            song.bars[index].slots = slots
+        }
+    }
+
+    private func adoptGrid(of pattern: RhythmPattern) {
+        if song.beatsPerBar != pattern.beatsPerBar || song.division != pattern.division {
+            song.beatsPerBar = pattern.beatsPerBar
+            song.division = pattern.division
+            song.normalizeBars()
+        }
+    }
+
+    /// Рисунок мог быть записан под другую сетку — подгоняем длину.
+    private func fitted(_ pattern: RhythmPattern) -> [[StepEvent]] {
+        var slots = pattern.slots
+        let target = song.slotsPerBar
+        if slots.count > target {
+            slots = Array(slots.prefix(target))
+        } else if slots.count < target {
+            slots += Array(repeating: [], count: target - slots.count)
+        }
+        return slots
+    }
+
+    // MARK: Отмена и буфер
+
+    private var undoStack: [Song] = []
+    private var redoStack: [Song] = []
+    private(set) var copiedBar: Bar?
+
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
+    /// Снимок перед правкой. Проект — значение, поэтому копия дёшева.
+    func pushUndo() {
+        undoStack.append(song)
+        if undoStack.count > 60 { undoStack.removeFirst() }
+        redoStack.removeAll()
+    }
+
+    func undo() {
+        guard let previous = undoStack.popLast() else { return }
+        redoStack.append(song)
+        player.stop()
+        song = previous
+    }
+
+    func redo() {
+        guard let next = redoStack.popLast() else { return }
+        undoStack.append(song)
+        player.stop()
+        song = next
+    }
+
+    func copyBar(at index: Int) {
+        guard song.bars.indices.contains(index) else { return }
+        copiedBar = song.bars[index]
+    }
+
+    func pasteBar(at index: Int) {
+        guard let copied = copiedBar, song.bars.indices.contains(index) else { return }
+        pushUndo()
+        var bar = copied
+        bar.id = song.bars[index].id
+        bar.resize(to: song.slotsPerBar)
+        song.bars[index] = bar
+    }
+
     func setBarChord(bar: Int, source: PadSource) {
+        pushUndo()
         guard song.bars.indices.contains(bar) else { return }
         song.bars[bar].chord = source
     }
 
     func addBar() {
+        pushUndo()
         let source = song.bars.last?.chord ?? .degree(index: 0, seventh: false)
         song.bars.append(Bar(chord: source, slots: song.bars.last?.slots))
     }
 
     func duplicateBar(at index: Int) {
+        pushUndo()
         guard song.bars.indices.contains(index) else { return }
         var copy = song.bars[index]
         copy.id = UUID()
@@ -676,11 +769,13 @@ final class AppState {
     }
 
     func removeBar(at index: Int) {
+        pushUndo()
         guard song.bars.count > 1, song.bars.indices.contains(index) else { return }
         song.bars.remove(at: index)
     }
 
     func clearBar(at index: Int) {
+        pushUndo()
         guard song.bars.indices.contains(index) else { return }
         song.bars[index].slots = Array(repeating: [], count: song.slotsPerBar)
     }

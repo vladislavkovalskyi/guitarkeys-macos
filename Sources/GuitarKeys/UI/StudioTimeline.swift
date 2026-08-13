@@ -105,6 +105,7 @@ struct StudioTimeline: View {
             }
         }
         .frame(height: 34)
+                .contentShape(Rectangle())
     }
 
     // MARK: Бой
@@ -163,6 +164,7 @@ struct StudioTimeline: View {
                 Rectangle()
                     .fill(Theme.accent)
                     .frame(width: 2, height: height)
+                    .contentShape(Rectangle())
                     .offset(x: CGFloat(slot) * cellWidth)
                     .allowsHitTesting(false)
                     .animation(.linear(duration: 0.05), value: slot)
@@ -189,19 +191,56 @@ private struct ChordClip: View {
 
     var body: some View {
         Menu {
+            // Ступени тональности идут первыми: ими пользуются чаще всего,
+            // и они едут за сменой тональности.
             Section("Ступень тональности") {
                 ForEach(0..<7, id: \.self) { degree in
                     let triad = state.song.key.chord(degree: degree, seventh: false)
                     let seventh = state.song.key.chord(degree: degree, seventh: true)
-                    Button(triad.name) {
+                    Button("\(triad.name)  ·  \(state.song.key.roman(degree: degree, seventh: false))") {
                         state.setBarChord(bar: index, source: .degree(index: degree, seventh: false))
                     }
-                    Button(seventh.name) {
+                    Button("\(seventh.name)  ·  \(state.song.key.roman(degree: degree, seventh: true))") {
                         state.setBarChord(bar: index, source: .degree(index: degree, seventh: true))
                     }
                 }
             }
+
+            // Любой из 252 аккордов: сначала тон, внутри — виды по группам.
+            Menu("Любой аккорд") {
+                ForEach(0..<12, id: \.self) { tone in
+                    Menu(Pitch.name(tone)) {
+                        ForEach(ChordQuality.Family.allCases) { family in
+                            Section(family.title) {
+                                ForEach(family.qualities, id: \.self) { quality in
+                                    Button(Chord(root: tone, quality: quality).name) {
+                                        state.setBarChord(bar: index,
+                                                          source: .fixed(Chord(root: tone, quality: quality)))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Divider()
+
+            Menu("Ритм такта") {
+                ForEach(RhythmPattern.Family.allCases) { family in
+                    Section(family.title) {
+                        ForEach(RhythmLibrary.patterns(in: family)) { pattern in
+                            Button(pattern.name) { state.applyPattern(pattern, toBar: index) }
+                        }
+                    }
+                }
+            }
+
+            Divider()
+            Button("Копировать такт") { state.copyBar(at: index) }
+            if state.copiedBar != nil {
+                Button("Вставить в этот такт") { state.pasteBar(at: index) }
+            }
             Button("Продублировать такт") { state.duplicateBar(at: index) }
             Button("Очистить такт") { state.clearBar(at: index) }
             Button("Удалить такт", role: .destructive) { state.removeBar(at: index) }

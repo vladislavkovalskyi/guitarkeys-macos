@@ -79,3 +79,12 @@ extension View {
             .foregroundStyle(.secondary)
     }
 }
+
+extension View {
+    /// Зона нажатия — прямоугольник, а не силуэт иконки, и не мельче 30×30.
+    /// Целиться курсором точно в стрелку неудобно: промах ощущается как поломка.
+    func hitArea(width: CGFloat? = nil, height: CGFloat = 32) -> some View {
+        frame(minWidth: width ?? 30, minHeight: max(30, height))
+            .contentShape(Rectangle())
+    }
+}

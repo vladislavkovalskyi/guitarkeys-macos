@@ -46,6 +46,7 @@ struct HeaderView: View {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 13, weight: .semibold))
                     .frame(width: 30, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.glass)
             .help("Настройки и привязки клавиш")
@@ -102,6 +103,7 @@ struct HeaderView: View {
             } label: {
                 Image(systemName: "minus").font(.system(size: 11, weight: .bold))
                     .frame(width: 28, height: 30)
+                    .contentShape(Rectangle())
             }
             .contentShape(Rectangle())
             .buttonStyle(.plain)
@@ -121,6 +123,7 @@ struct HeaderView: View {
             } label: {
                 Image(systemName: "plus").font(.system(size: 11, weight: .bold))
                     .frame(width: 28, height: 30)
+                    .contentShape(Rectangle())
             }
             .contentShape(Rectangle())
             .buttonStyle(.plain)

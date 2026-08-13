@@ -45,6 +45,7 @@ private struct PadView: View {
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(isHeld ? Color.black.opacity(0.75) : .secondary)
                 .frame(width: 20, height: 20)
+                    .contentShape(Rectangle())
                 .background {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(isHeld ? Theme.accent : Color.white.opacity(0.10))

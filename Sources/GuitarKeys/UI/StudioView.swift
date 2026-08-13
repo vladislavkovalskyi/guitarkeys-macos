@@ -26,6 +26,7 @@ struct StudioView: View {
                         .font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 10)
                         .frame(height: 30)
+                .contentShape(Rectangle())
                 }
                 .buttonStyle(.glass)
 
@@ -54,6 +55,7 @@ struct StudioView: View {
                 }
                 .padding(.horizontal, compact ? 10 : 14)
                 .frame(height: 34)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.glass)
             .tint(Theme.accent)
@@ -65,6 +67,7 @@ struct StudioView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(state.player.loops ? Theme.accent : .secondary)
                     .frame(width: 34, height: 34)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.glass)
             .help("Повторять по кругу (L)")
@@ -91,10 +94,41 @@ struct StudioView: View {
                 }
                 .padding(.horizontal, 8)
                 .frame(height: 34)
+                .contentShape(Rectangle())
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
             .glassEffect(.regular.interactive(), in: .capsule)
+
+            // Готовый бой на весь проект — быстрее, чем набивать его по ячейкам.
+            Menu {
+                ForEach(RhythmPattern.Family.allCases) { family in
+                    Section(family.title) {
+                        ForEach(RhythmLibrary.patterns(in: family)) { pattern in
+                            Button("\(pattern.name) — \(pattern.subtitle)") {
+                                state.applyPatternToAll(pattern)
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "music.quarternote.3")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                    if !compact {
+                        Text("Ритм")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                    }
+                }
+                .padding(.horizontal, compact ? 8 : 11)
+                .frame(height: 34)
+                .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .help("Положить готовый бой во все такты")
 
             if !compact {
                 Text(durationLabel)
@@ -108,6 +142,7 @@ struct StudioView: View {
                 Image(systemName: "square.and.arrow.down")
                     .font(.system(size: 12, weight: .semibold))
                     .frame(width: 34, height: 34)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.glass)
             .help("Сохранить проект")
@@ -135,6 +170,7 @@ struct StudioView: View {
                 }
                 .padding(.horizontal, compact ? 8 : 12)
                 .frame(height: 34)
+                .contentShape(Rectangle())
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
@@ -155,6 +191,7 @@ struct StudioView: View {
             Button(action: minus) {
                 Image(systemName: "minus").font(.system(size: 9, weight: .bold))
                     .frame(width: 26, height: 32)
+                    .contentShape(Rectangle())
             }
             .contentShape(Rectangle())
             .buttonStyle(.plain)
@@ -172,6 +209,7 @@ struct StudioView: View {
             Button(action: plus) {
                 Image(systemName: "plus").font(.system(size: 9, weight: .bold))
                     .frame(width: 26, height: 32)
+                    .contentShape(Rectangle())
             }
             .contentShape(Rectangle())
             .buttonStyle(.plain)
@@ -255,6 +293,7 @@ struct StudioView: View {
 
     private var divider: some View {
         Rectangle().fill(Color.white.opacity(0.12)).frame(width: 1, height: 20)
+                    .contentShape(Rectangle())
     }
 
     private func brushChip(_ value: StudioBrush, symbol: String?,
@@ -281,6 +320,7 @@ struct StudioView: View {
             .foregroundStyle(selected ? Color.black.opacity(0.82)
                                       : (muted ? Theme.mutedAccent : Theme.accent))
             .frame(width: label == nil ? 36 : 40, height: 30)
+                    .contentShape(Rectangle())
         }
         .contentShape(Rectangle())
         .buttonStyle(.plain)

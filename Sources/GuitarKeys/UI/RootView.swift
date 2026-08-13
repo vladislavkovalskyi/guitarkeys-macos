@@ -87,6 +87,7 @@ struct RootView: View {
         Rectangle()
             .fill(Color.white.opacity(0.12))
             .frame(width: 1, height: 10)
+                    .contentShape(Rectangle())
     }
 
     private func hint(_ title: String, _ value: String) -> some View {

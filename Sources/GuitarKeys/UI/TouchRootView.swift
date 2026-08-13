@@ -39,6 +39,7 @@ struct TouchRootView: View {
             // Размер задаём явно: фон с ignoresSafeArea, лежащий в стопке рядом
             // с содержимым, растягивал бы контейнер за пределы экрана.
             .frame(width: proxy.size.width, height: proxy.size.height)
+                    .contentShape(Rectangle())
             .background {
                 AmbientBackground(root: state.currentChord.root, energy: energy)
                     .ignoresSafeArea()
@@ -112,6 +113,7 @@ struct TouchRootView: View {
                     }
                     .padding(.horizontal, 11)
                     .frame(height: 34)
+                .contentShape(Rectangle())
                 }
                 .buttonStyle(.glass)
             } else {
@@ -149,6 +151,7 @@ struct TouchRootView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(selected ? Color.black.opacity(0.82) : .secondary)
                         .frame(width: 32, height: 28)
+                    .contentShape(Rectangle())
                         .background {
                             if selected { Capsule().fill(Theme.accent) }
                         }
@@ -172,6 +175,7 @@ struct TouchRootView: View {
             Button { state.transpose(by: -1) } label: {
                 Image(systemName: "minus").font(.system(size: 11, weight: .bold))
                     .frame(width: 26, height: 30)
+                    .contentShape(Rectangle())
             }
             .contentShape(Rectangle())
             .buttonStyle(.plain)
@@ -196,6 +200,7 @@ struct TouchRootView: View {
             Button { state.transpose(by: 1) } label: {
                 Image(systemName: "plus").font(.system(size: 11, weight: .bold))
                     .frame(width: 26, height: 30)
+                    .contentShape(Rectangle())
             }
             .contentShape(Rectangle())
             .buttonStyle(.plain)
@@ -213,6 +218,7 @@ struct TouchRootView: View {
                 .foregroundStyle(Color.black.opacity(0.8))
                 .padding(.horizontal, 12)
                 .frame(height: 30)
+                .contentShape(Rectangle())
                 .background(Capsule().fill(Theme.accent))
         }
         .contentShape(Rectangle())
@@ -228,6 +234,7 @@ struct TouchRootView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 38, height: 34)
+                    .contentShape(Rectangle())
         }
         .buttonStyle(.glass)
         .accessibilityLabel(label)

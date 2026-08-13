@@ -64,6 +64,7 @@ private struct AutoStrumToggle: View {
                 .lineSpacing(1)
         }
         .frame(width: 96, height: 74)
+                    .contentShape(Rectangle())
         .glassEffect(isOn ? .regular.tint(Theme.accent.opacity(0.75)).interactive()
                           : .regular.interactive(),
                      in: .rect(cornerRadius: Theme.padCorner, style: .continuous))
@@ -99,6 +100,7 @@ private struct RecordButton: View {
                     Circle()
                         .stroke(Theme.record.opacity(0.5), lineWidth: 2)
                         .frame(width: 26, height: 26)
+                    .contentShape(Rectangle())
                         .scaleEffect(1 + state.recordingLevel * 0.5)
                         .opacity(1 - state.recordingLevel * 0.45)
                 }
@@ -108,6 +110,7 @@ private struct RecordButton: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(isRecording ? state.recordingTimeText : "запись")
@@ -177,6 +180,7 @@ private struct StrumButton: View {
                 .opacity(isHovering || isFlashing ? 1 : 0.55)
         }
         .frame(width: 96, height: 74)
+                    .contentShape(Rectangle())
         .glassEffect(glassStyle, in: .rect(cornerRadius: Theme.padCorner, style: .continuous))
         .glassEffectID(action.rawValue, in: namespace)
         .overlay {
