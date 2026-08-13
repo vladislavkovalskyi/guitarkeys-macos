@@ -5,43 +5,59 @@ import SwiftUI
 struct TouchRootView: View {
     @Environment(AppState.self) private var state
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.scenePhase) private var scenePhase
     @UIState private var energy: Double = 0
 
     var body: some View {
         @Bindable var state = state
 
         GeometryReader { proxy in
-            // На телефоне в портрете места мало, поэтому всё ужимается.
-            let compact = sizeClass == .compact || proxy.size.width < 700
-            let columns = compact ? 4 : 7
-            let padHeight: CGFloat = compact ? 60 : 84
-            let strumHeight: CGFloat = compact ? 66 : 86
+            // Считаем по реальному размеру, а не только по классу: в ландшафте
+            // телефон широкий, но низкий, и раскладку решает именно высота.
+            let narrow = proxy.size.width < 700
+            let short = proxy.size.height < 520
+            let compact = narrow || sizeClass == .compact
 
-            ZStack {
+            // Узкий экран — меньше колонок; низкий — ниже площадки,
+            // иначе четыре ряда аккордов съедают гриф.
+            let columns = narrow ? 4 : 7
+            let padHeight: CGFloat = short ? 46 : (compact ? 60 : 84)
+            let strumHeight: CGFloat = short ? 52 : (compact ? 66 : 86)
+
+            VStack(spacing: compact ? 10 : 14) {
+                header(compact: compact)
+                TouchPadGrid(columns: columns, padHeight: padHeight)
+                FretboardView()
+                TouchStrumBar(height: strumHeight)
+            }
+            .padding(.horizontal, compact ? 12 : 20)
+            .padding(.bottom, compact ? 8 : 16)
+            // Размер задаём явно: фон с ignoresSafeArea, лежащий в стопке рядом
+            // с содержимым, растягивал бы контейнер за пределы экрана.
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .background {
                 AmbientBackground(root: state.currentChord.root, energy: energy)
-
-                VStack(spacing: compact ? 10 : 14) {
-                    header(compact: compact)
-                    TouchPadGrid(columns: columns, padHeight: padHeight)
-                    FretboardView()
-                    TouchStrumBar(height: strumHeight)
-                }
-                .padding(.horizontal, compact ? 12 : 20)
-                .padding(.bottom, compact ? 8 : 16)
-
+                    .ignoresSafeArea()
+            }
+            .overlay(alignment: .bottom) {
                 if let notice = state.recordingNotice {
-                    VStack {
-                        Spacer()
-                        RecordingNotice(url: notice)
-                            .padding(.horizontal, 12)
-                            .padding(.bottom, compact ? 96 : 116)
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    RecordingNotice(url: notice)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, compact ? 96 : 116)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
         }
         .preferredColorScheme(.dark)
         .onAppear { Haptics.prepare() }
+        .onChange(of: scenePhase) { _, phase in
+            // На iOS нет applicationWillTerminate: приложение просто уходит в фон.
+            // Незакрытый файл записи остался бы битым, поэтому закрываем сами.
+            if phase != .active {
+                state.stopRecording()
+                state.stopPlayback()
+            }
+        }
         .onChange(of: state.strumTick) { _, _ in
             withAnimation(.easeOut(duration: 0.10)) { energy = 1 }
             withAnimation(.easeOut(duration: 0.85).delay(0.10)) { energy = 0 }
@@ -59,8 +75,8 @@ struct TouchRootView: View {
 
     private func header(compact: Bool) -> some View {
         HStack(spacing: 8) {
-            keyStepper
-            scaleToggle
+            keyStepper(compact: compact)
+            if !compact { scaleToggle }
 
             Spacer(minLength: 4)
 
@@ -115,19 +131,34 @@ struct TouchRootView: View {
         }
     }
 
-    private var keyStepper: some View {
-        HStack(spacing: 2) {
+    private func keyStepper(compact: Bool) -> some View {
+        // На узком экране слово «мажор» рядом не помещается, поэтому лад пишется
+        // прямо в названии тональности: C или Cm, как записывают аккорд.
+        let tonic = Pitch.name(state.preferences.key.tonic)
+        let title = compact && state.preferences.key.scale == .minor ? tonic + "m" : tonic
+
+        return HStack(spacing: 2) {
             Button { state.transpose(by: -1) } label: {
                 Image(systemName: "minus").font(.system(size: 11, weight: .bold))
                     .frame(width: 26, height: 30)
             }
             .buttonStyle(.plain)
 
-            Text(Pitch.name(state.preferences.key.tonic))
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(Theme.accent)
-                .frame(minWidth: 30)
-                .contentTransition(.numericText())
+            Button {
+                guard compact else { return }
+                state.setKey(scale: state.preferences.key.scale == .major ? .minor : .major)
+                Haptics.pluck()
+            } label: {
+                Text(title)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.accent)
+                    .frame(minWidth: 34)
+                    .fixedSize()
+                    .contentTransition(.numericText())
+            }
+            .buttonStyle(.plain)
+            .disabled(!compact)
+            .accessibilityLabel(state.preferences.key.name)
 
             Button { state.transpose(by: 1) } label: {
                 Image(systemName: "plus").font(.system(size: 11, weight: .bold))
