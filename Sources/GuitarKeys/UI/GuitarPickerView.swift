@@ -78,6 +78,7 @@ struct GuitarPickerView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 62)
         }
+        .contentShape(Rectangle())
         .buttonStyle(.plain)
         .focusEffectDisabled()   // прямоугольное кольцо фокуса ломает форму карточки
         .glassEffect(selected ? .regular.tint(Theme.accent.opacity(0.9)).interactive()

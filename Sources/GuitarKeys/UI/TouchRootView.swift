@@ -153,6 +153,7 @@ struct TouchRootView: View {
                             if selected { Capsule().fill(Theme.accent) }
                         }
                 }
+                .contentShape(Rectangle())
                 .buttonStyle(.plain)
                 .accessibilityLabel(screen.title)
             }
@@ -172,6 +173,7 @@ struct TouchRootView: View {
                 Image(systemName: "minus").font(.system(size: 11, weight: .bold))
                     .frame(width: 26, height: 30)
             }
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
 
             Button {
@@ -186,6 +188,7 @@ struct TouchRootView: View {
                     .fixedSize()
                     .contentTransition(.numericText())
             }
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
             .disabled(!compact)
             .accessibilityLabel(state.preferences.key.name)
@@ -194,6 +197,7 @@ struct TouchRootView: View {
                 Image(systemName: "plus").font(.system(size: 11, weight: .bold))
                     .frame(width: 26, height: 30)
             }
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 4)
@@ -211,6 +215,7 @@ struct TouchRootView: View {
                 .frame(height: 30)
                 .background(Capsule().fill(Theme.accent))
         }
+        .contentShape(Rectangle())
         .buttonStyle(.plain)
     }
 

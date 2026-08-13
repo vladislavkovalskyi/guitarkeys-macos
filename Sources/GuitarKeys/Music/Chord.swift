@@ -24,6 +24,36 @@ enum Pitch {
 
 enum ChordQuality: String, Codable, CaseIterable, Hashable, Sendable {
     case major, minor, dom7, min7, maj7, sus2, sus4, dim, m7b5, power
+    case add9, six, m6, dim7, aug, sevenSus4, mMaj7, nine, mNine, majNine, sixNine
+
+    /// Группы для выбора: от простого к сложному.
+    enum Family: String, CaseIterable, Identifiable, Sendable {
+        case triads, sevenths, suspended, colour
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .triads:    return "Простые"
+            case .sevenths:  return "Септаккорды"
+            case .suspended: return "Sus и квинты"
+            case .colour:    return "Сложные"
+            }
+        }
+
+        var qualities: [ChordQuality] {
+            switch self {
+            case .triads:    return [.major, .minor, .dim, .aug]
+            case .sevenths:  return [.dom7, .min7, .maj7, .m7b5, .dim7, .mMaj7]
+            case .suspended: return [.sus2, .sus4, .sevenSus4, .power]
+            case .colour:    return [.six, .m6, .add9, .nine, .mNine, .majNine, .sixNine]
+            }
+        }
+    }
+
+    var family: Family {
+        Family.allCases.first { $0.qualities.contains(self) } ?? .triads
+    }
 
     /// Суффикс в имени аккорда: C, Cm, C7, Cm7, Cmaj7…
     var suffix: String {
@@ -38,6 +68,17 @@ enum ChordQuality: String, Codable, CaseIterable, Hashable, Sendable {
         case .dim:   return "dim"
         case .m7b5:  return "m7b5"
         case .power: return "5"
+        case .add9:      return "add9"
+        case .six:       return "6"
+        case .m6:        return "m6"
+        case .dim7:      return "dim7"
+        case .aug:       return "aug"
+        case .sevenSus4: return "7sus4"
+        case .mMaj7:     return "mMaj7"
+        case .nine:      return "9"
+        case .mNine:     return "m9"
+        case .majNine:   return "maj9"
+        case .sixNine:   return "6/9"
         }
     }
 
@@ -53,6 +94,17 @@ enum ChordQuality: String, Codable, CaseIterable, Hashable, Sendable {
         case .dim:   return "уменьшённый"
         case .m7b5:  return "полууменьш."
         case .power: return "квинта"
+        case .add9:      return "с ноной"
+        case .six:       return "секстаккорд"
+        case .m6:        return "мин. секст"
+        case .dim7:      return "уменьш. септ"
+        case .aug:       return "увеличенный"
+        case .sevenSus4: return "септ sus4"
+        case .mMaj7:     return "мин. с большой септ"
+        case .nine:      return "нонаккорд"
+        case .mNine:     return "мин. нонаккорд"
+        case .majNine:   return "большой нонаккорд"
+        case .sixNine:   return "секста с ноной"
         }
     }
 
@@ -69,6 +121,44 @@ enum ChordQuality: String, Codable, CaseIterable, Hashable, Sendable {
         case .dim:   return [0, 3, 6]
         case .m7b5:  return [0, 3, 6, 10]
         case .power: return [0, 7]
+        case .add9:      return [0, 2, 4, 7]
+        case .six:       return [0, 4, 7, 9]
+        case .m6:        return [0, 3, 7, 9]
+        case .dim7:      return [0, 3, 6, 9]
+        case .aug:       return [0, 4, 8]
+        case .sevenSus4: return [0, 5, 7, 10]
+        case .mMaj7:     return [0, 3, 7, 11]
+        case .nine:      return [0, 2, 4, 7, 10]
+        case .mNine:     return [0, 2, 3, 7, 10]
+        case .majNine:   return [0, 2, 4, 7, 11]
+        case .sixNine:   return [0, 2, 4, 7, 9]
+        }
+    }
+
+    /// Ступени, без которых аккорд перестаёт быть собой. Квинту гитаристы опускают
+    /// свободно, а вот терция и септима определяют его звучание.
+    var essentialIntervals: [Int] {
+        switch self {
+        case .major, .aug:  return [0, 4]
+        case .minor:        return [0, 3]
+        case .dim:          return [0, 3, 6]
+        case .dom7:         return [0, 4, 10]
+        case .min7:         return [0, 3, 10]
+        case .maj7:         return [0, 4, 11]
+        case .m7b5:         return [0, 3, 6, 10]
+        case .dim7:         return [0, 3, 6, 9]
+        case .mMaj7:        return [0, 3, 11]
+        case .sus2:         return [0, 2, 7]
+        case .sus4:         return [0, 5, 7]
+        case .sevenSus4:    return [0, 5, 10]
+        case .power:        return [0, 7]
+        case .add9:         return [0, 2, 4]
+        case .six:          return [0, 4, 9]
+        case .m6:           return [0, 3, 9]
+        case .nine:         return [0, 2, 4, 10]
+        case .mNine:        return [0, 2, 3, 10]
+        case .majNine:      return [0, 2, 4, 11]
+        case .sixNine:      return [0, 2, 4, 9]
         }
     }
 }

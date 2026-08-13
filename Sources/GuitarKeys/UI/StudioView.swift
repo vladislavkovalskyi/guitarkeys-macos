@@ -18,7 +18,7 @@ struct StudioView: View {
                            cellWidth: state.timelineZoom,
                            showsTabs: state.showsTabs,
                            compact: compact)
-                .frame(maxHeight: .infinity, alignment: .top)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             HStack(spacing: 8) {
                 Button { state.addBar() } label: {
@@ -154,8 +154,9 @@ struct StudioView: View {
         HStack(spacing: 3) {
             Button(action: minus) {
                 Image(systemName: "minus").font(.system(size: 9, weight: .bold))
-                    .frame(width: 20, height: 28)
+                    .frame(width: 26, height: 32)
             }
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
             .focusEffectDisabled()
 
@@ -170,8 +171,9 @@ struct StudioView: View {
 
             Button(action: plus) {
                 Image(systemName: "plus").font(.system(size: 9, weight: .bold))
-                    .frame(width: 20, height: 28)
+                    .frame(width: 26, height: 32)
             }
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
             .focusEffectDisabled()
         }
@@ -280,6 +282,7 @@ struct StudioView: View {
                                       : (muted ? Theme.mutedAccent : Theme.accent))
             .frame(width: label == nil ? 36 : 40, height: 30)
         }
+        .contentShape(Rectangle())
         .buttonStyle(.plain)
         .focusEffectDisabled()
         .background {

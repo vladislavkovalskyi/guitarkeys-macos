@@ -48,6 +48,8 @@ final class AppState {
     var inspectorPad: Pad?
     var showsSettings = false
     var showsGuitarPicker = false
+    /// Окно развёрнуто на весь экран: кнопки окна прячутся, отступ под них не нужен.
+    var isFullScreen = false
 
     private let audio = AudioEngine()
     /// Проигрыватель проектов студии.

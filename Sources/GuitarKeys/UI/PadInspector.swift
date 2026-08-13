@@ -158,6 +158,7 @@ struct PadInspector: View {
                     .fill(selected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.quaternary))
             }
         }
+        .contentShape(Rectangle())
         .buttonStyle(.plain)
         .focusEffectDisabled()
     }

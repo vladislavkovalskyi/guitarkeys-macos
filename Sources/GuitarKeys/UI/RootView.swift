@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct RootView: View {
     @Environment(AppState.self) private var state
@@ -27,7 +30,10 @@ struct RootView: View {
                 }
                 .padding(.horizontal, 22)
                 .padding(.bottom, 20)
-                .frame(maxHeight: .infinity)   // запас высоты уходит грифу
+                // На весь экран содержимое не растягиваем до края: сетка аккордов
+                // и гриф становятся неудобно широкими. Держим предел и центрируем.
+                .frame(maxWidth: 1600, maxHeight: .infinity)
+                .frame(maxWidth: .infinity)
             }
 
             if state.bindingTarget != nil {
@@ -40,6 +46,14 @@ struct RootView: View {
         }
         .frame(minWidth: 860, minHeight: 640)
         .preferredColorScheme(.dark)
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
+            state.isFullScreen = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
+            state.isFullScreen = false
+        }
+        #endif
         .onChange(of: state.strumTick) { _, _ in
             withAnimation(.easeOut(duration: 0.10)) { energy = 1 }
             withAnimation(.easeOut(duration: 0.85).delay(0.10)) { energy = 0 }

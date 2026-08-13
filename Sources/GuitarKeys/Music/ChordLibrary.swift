@@ -55,7 +55,8 @@ enum ChordLibrary {
         case .maj7:  return [0, 2, 1, 1, 0, 0]
         case .sus4:  return [0, 2, 2, 2, 0, 0]
         case .power: return [0, 2, 2, nil, nil, nil]
-        case .sus2, .dim, .m7b5: return nil // берём форму от 5-й струны
+        // Остальным готовых форм нет — их подбирает перебор позиций.
+        default: return nil
         }
     }
 
@@ -72,6 +73,7 @@ enum ChordLibrary {
         case .dim:   return [nil, 0, 1, 2, 1, nil]
         case .m7b5:  return [nil, 0, 1, 0, 1, nil]
         case .power: return [nil, 0, 2, 2, nil, nil]
+        default: return nil
         }
     }
 
@@ -136,8 +138,75 @@ enum ChordLibrary {
         if let best = candidates.min(by: { maxFret($0) < maxFret($1) }) {
             return Voicing(best)
         }
+        // Для сложных аккордов готовых форм нет — подбираем позицию перебором.
+        if let generated = generated(chord) {
+            return generated
+        }
         // Страховка: квинта от 6-й струны.
         return Voicing(shifted([0, 2, 2, nil, nil, nil], by: rootFretOnSixth(chord.root)))
+    }
+
+    /// Подбор аппликатуры перебором позиций.
+    ///
+    /// Ищем окно в четыре лада, где на струнах набирается как можно больше нот
+    /// аккорда. Басом обязан быть основной тон, иначе аккорд звучит обращением,
+    /// поэтому нижние струны глушим, пока не дойдём до него.
+    private static func generated(_ chord: Chord) -> Voicing? {
+        let tones = chord.pitchClasses
+        let essential = Set(chord.quality.essentialIntervals.map { (chord.root + $0) % 12 })
+
+        var best: (score: Int, frets: [Int?])?
+
+        for base in 0...11 {
+            // На струне может подойти больше одного лада, а брать первый попавшийся
+            // нельзя: в нонаккорде тогда не набирается терция с септимой. Поэтому
+            // перебираем все сочетания, включая заглушенную струну.
+            let options: [[Int?]] = (0..<6).map { string in
+                let open = Pitch.standardTuning[string] % 12
+                let frets = (base...(base + 3)).filter { tones.contains((open + $0) % 12) }
+                return [nil] + frets.map { Optional($0) }
+            }
+
+            var frets: [Int?] = Array(repeating: nil, count: 6)
+
+            func search(_ string: Int) {
+                guard string < 6 else {
+                    evaluate(frets)
+                    return
+                }
+                for option in options[string] {
+                    frets[string] = option
+                    search(string + 1)
+                }
+                frets[string] = nil
+            }
+
+            func evaluate(_ candidate: [Int?]) {
+                let sounding = (0..<6).compactMap { string -> Int? in
+                    candidate[string].map { (Pitch.standardTuning[string] + $0) % 12 }
+                }
+                guard sounding.count >= 4 else { return }
+                // Бас обязан быть основным тоном, иначе аккорд звучит обращением.
+                guard let bass = (0..<6).first(where: { candidate[$0] != nil }),
+                      (Pitch.standardTuning[bass] + (candidate[bass] ?? 0)) % 12 == chord.root
+                else { return }
+                guard essential.isSubset(of: Set(sounding)) else { return }
+                // Играть удобнее подряд идущие струны, без дырок посередине.
+                let playing = (0..<6).filter { candidate[$0] != nil }
+                guard let low = playing.first, let high = playing.last,
+                      high - low + 1 == playing.count else { return }
+
+                let highest = candidate.compactMap { $0 }.max() ?? 0
+                let score = sounding.count * 20 - highest
+                if best == nil || score > best!.score {
+                    best = (score, candidate)
+                }
+            }
+
+            search(0)
+        }
+
+        return best.map { Voicing($0.frets) }
     }
 
     private static func maxFret(_ frets: [Int?]) -> Int {

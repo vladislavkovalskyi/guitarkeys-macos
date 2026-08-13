@@ -17,35 +17,45 @@ struct StudioTimeline: View {
     private var song: Song { state.song }
     private let gutter: CGFloat = 34
 
+    /// Высоты дорожек считаются от доступного места, иначе под таймлайном
+    /// остаётся пустое поле, а на весь экран — половина окна.
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
-            trackLabels
+        GeometryReader { proxy in
+            let rest = max(150, proxy.size.height - 16 - 34 - 14)
+            let strumHeight = showsTabs ? max(44, rest * 0.34) : rest
+            let tabHeight = showsTabs ? max(18, (rest - strumHeight - 10) / 6) : 0
 
-            ScrollView(.horizontal, showsIndicators: true) {
-                ZStack(alignment: .topLeading) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ruler
-                        chordTrack
-                        strumTrack
-                        if showsTabs { tabTracks }
+            HStack(alignment: .top, spacing: 6) {
+                trackLabels(strumHeight: strumHeight, tabHeight: tabHeight)
+
+                ScrollView(.horizontal, showsIndicators: true) {
+                    ZStack(alignment: .topLeading) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ruler
+                            chordTrack
+                            strumTrack(height: strumHeight)
+                            if showsTabs { tabTracks(height: tabHeight) }
+                        }
+                        playhead(height: proxy.size.height)
                     }
-                    playhead
+                    .padding(.trailing, 24)
                 }
-                .padding(.trailing, 24)
             }
         }
     }
 
     // MARK: Подписи дорожек
 
-    private var trackLabels: some View {
+    private func trackLabels(strumHeight: CGFloat, tabHeight: CGFloat) -> some View {
         VStack(alignment: .trailing, spacing: 4) {
             label("такт", height: 16)
             label("аккорд", height: 34)
-            label("бой", height: 42)
+            label("бой", height: strumHeight)
             if showsTabs {
-                ForEach((0..<6).reversed(), id: \.self) { string in
-                    label(Pitch.name(Pitch.standardTuning[string] % 12), height: 20)
+                VStack(spacing: 2) {
+                    ForEach((0..<6).reversed(), id: \.self) { string in
+                        label(Pitch.name(Pitch.standardTuning[string] % 12), height: tabHeight)
+                    }
                 }
             }
         }
@@ -99,7 +109,7 @@ struct StudioTimeline: View {
 
     // MARK: Бой
 
-    private var strumTrack: some View {
+    private func strumTrack(height: CGFloat) -> some View {
         HStack(spacing: 0) {
             ForEach(Array(song.bars.enumerated()), id: \.element.id) { index, bar in
                 ForEach(0..<bar.slotCount, id: \.self) { slot in
@@ -114,12 +124,12 @@ struct StudioTimeline: View {
                 }
             }
         }
-        .frame(height: 42)
+        .frame(height: height)
     }
 
     // MARK: Табулатура
 
-    private var tabTracks: some View {
+    private func tabTracks(height: CGFloat) -> some View {
         VStack(spacing: 2) {
             ForEach((0..<6).reversed(), id: \.self) { string in
                 HStack(spacing: 0) {
@@ -139,20 +149,20 @@ struct StudioTimeline: View {
                         }
                     }
                 }
-                .frame(height: 20)
+                .frame(height: height)
             }
         }
     }
 
     // MARK: Курсор
 
-    private var playhead: some View {
+    private func playhead(height: CGFloat) -> some View {
         let slot = state.player.currentSlot
         return Group {
             if slot >= 0 {
                 Rectangle()
                     .fill(Theme.accent)
-                    .frame(width: 2)
+                    .frame(width: 2, height: height)
                     .offset(x: CGFloat(slot) * cellWidth)
                     .allowsHitTesting(false)
                     .animation(.linear(duration: 0.05), value: slot)

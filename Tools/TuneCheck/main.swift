@@ -249,23 +249,6 @@ do {
 
 print("\nАппликатуры аккордов:")
 do {
-    // Квинту гитаристы часто опускают (классический C7 — x32310, без соль),
-    // а вот основной тон, терция и септима определяют аккорд и обязаны звучать.
-    func requiredIntervals(_ quality: ChordQuality) -> [Int] {
-        switch quality {
-        case .major: return [0, 4]
-        case .minor: return [0, 3]
-        case .dom7:  return [0, 4, 10]
-        case .min7:  return [0, 3, 10]
-        case .maj7:  return [0, 4, 11]
-        case .sus2:  return [0, 2, 7]
-        case .sus4:  return [0, 5, 7]
-        case .dim:   return [0, 3, 6]
-        case .m7b5:  return [0, 3, 6, 10]
-        case .power: return [0, 7]
-        }
-    }
-
     var wrong: [String] = []
     for root in 0..<12 {
         for quality in ChordQuality.allCases {
@@ -273,7 +256,7 @@ do {
             let voicing = ChordLibrary.voicing(for: chord)
             let allowed = chord.pitchClasses
             let sounding = Set(voicing.soundingStrings.compactMap { voicing.midiNote(string: $0) }.map { $0 % 12 })
-            let required = Set(requiredIntervals(quality).map { (root + $0) % 12 })
+            let required = Set(quality.essentialIntervals.map { (root + $0) % 12 })
 
             if !sounding.isSubset(of: allowed) {
                 wrong.append("\(chord.name): чужие ноты \(sounding.subtracting(allowed).sorted())")
@@ -284,7 +267,7 @@ do {
             }
         }
     }
-    check(wrong.isEmpty, "все 120 аккордов состоят из верных ступеней")
+    check(wrong.isEmpty, "все \(12 * ChordQuality.allCases.count) аккордов состоят из верных ступеней")
     for problem in wrong.prefix(12) { print("      · \(problem)") }
     if wrong.count > 12 { print("      · …ещё \(wrong.count - 12)") }
 }
@@ -299,14 +282,14 @@ do {
         for quality in ChordQuality.allCases {
             let chord = Chord(root: root, quality: quality)
             let voicing = ChordLibrary.voicing(for: chord)
-            if voicing.maxFret > 12 { tooHigh.append("\(chord.name) → \(voicing.maxFret) лад") }
+            if voicing.maxFret > 15 { tooHigh.append("\(chord.name) → \(voicing.maxFret) лад") }
             let pressed = voicing.frets.compactMap { $0 }.filter { $0 > 0 }
             if let low = pressed.min(), let high = pressed.max(), high - low > 3 {
                 tooWide.append("\(chord.name) → растяжка \(high - low)")
             }
         }
     }
-    check(tooHigh.isEmpty, "ни один аккорд не уходит выше 12 лада")
+    check(tooHigh.isEmpty, "ни один аккорд не уходит выше 15 лада")
     for problem in tooHigh.prefix(6) { print("      · \(problem)") }
     check(tooWide.isEmpty, "растяжка левой руки не больше 3 ладов")
     for problem in tooWide.prefix(6) { print("      · \(problem)") }

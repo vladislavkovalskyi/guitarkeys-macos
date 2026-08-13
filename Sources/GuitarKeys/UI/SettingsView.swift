@@ -74,6 +74,7 @@ struct SettingsView: View {
                                                        : AnyShapeStyle(.quaternary))
                                 }
                         }
+                        .contentShape(Rectangle())
                         .buttonStyle(.plain)
                         .focusEffectDisabled()
                     }

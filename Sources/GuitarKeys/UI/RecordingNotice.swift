@@ -39,6 +39,7 @@ struct RecordingNotice: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
             }
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
             .focusEffectDisabled()
             .foregroundStyle(.tertiary)
