@@ -107,10 +107,10 @@ enum Division: Int, Codable, Hashable, Sendable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .quarter:   return "1/4"
-        case .eighth:    return "1/8"
-        case .triplet:   return "триоли"
-        case .sixteenth: return "1/16"
+        case .quarter:   return L.t("division.quarter")
+        case .eighth:    return L.t("division.eighth")
+        case .triplet:   return L.t("division.triplet")
+        case .sixteenth: return L.t("division.sixteenth")
         }
     }
 

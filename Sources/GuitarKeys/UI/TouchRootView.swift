@@ -67,6 +67,7 @@ struct TouchRootView: View {
             withAnimation(.easeOut(duration: 0.10)) { energy = 1 }
             withAnimation(.easeOut(duration: 0.85).delay(0.10)) { energy = 0 }
         }
+        .sheet(isPresented: $state.showsAbout) { AboutView() }
         .sheet(item: $state.inspectorPad) { pad in
             PadInspector(pad: pad)
         }

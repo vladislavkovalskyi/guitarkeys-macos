@@ -32,16 +32,7 @@ enum GuitarAction: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    var title: String {
-        switch self {
-        case .strumDown:     return "Удар вниз"
-        case .strumUp:       return "Удар вверх"
-        case .mutedDown:     return "Глушёный вниз"
-        case .mutedUp:       return "Глушёный вверх"
-        case .transposeDown: return "Тональность −1"
-        case .transposeUp:   return "Тональность +1"
-        }
-    }
+    var title: String { L.t("action." + rawValue) }
 
     var symbolName: String {
         switch self {
@@ -84,6 +75,8 @@ struct Preferences: Codable, Sendable {
     var selectedGuitar: GuitarModel.Kind = .acoustic
     /// В каком формате писать живую игру.
     var recordingFormat: AudioFileFormat = .m4a
+    /// Язык интерфейса; system — брать из системы.
+    var language: Language = .system
     /// Текущий проект студии, чтобы он не терялся между запусками.
     var song: Song = Song()
     /// Правки тембра хранятся отдельно для каждого инструмента.
@@ -121,6 +114,7 @@ struct Preferences: Codable, Sendable {
         selectedGuitar = try container.decodeIfPresent(GuitarModel.Kind.self, forKey: .selectedGuitar) ?? fallback.selectedGuitar
         guitars = try container.decodeIfPresent([GuitarModel].self, forKey: .guitars) ?? fallback.guitars
         recordingFormat = try container.decodeIfPresent(AudioFileFormat.self, forKey: .recordingFormat) ?? fallback.recordingFormat
+        language = try container.decodeIfPresent(Language.self, forKey: .language) ?? fallback.language
         // Проект читаем отдельно и мягко: его формат меняется чаще прочих настроек,
         // и несовместимый проект не должен утаскивать за собой привязки клавиш.
         song = ((try? container.decodeIfPresent(Song.self, forKey: .song)) ?? nil) ?? fallback.song

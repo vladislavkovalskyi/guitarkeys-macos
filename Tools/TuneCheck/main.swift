@@ -464,6 +464,42 @@ do {
           "проводка сверху вниз задевает все струны по порядку: \(touched)")
 }
 
+print("\nЛокализация:")
+do {
+    let ruKeys = Set(L.ru.keys)
+    let enKeys = Set(L.en.keys)
+
+    let missingEn = ruKeys.subtracting(enKeys).sorted()
+    let missingRu = enKeys.subtracting(ruKeys).sorted()
+    check(missingEn.isEmpty, "английский полон: \(ruKeys.count) ключей")
+    for key in missingEn.prefix(8) { print("      · нет перевода: \(key)") }
+    check(missingRu.isEmpty, "лишних английских ключей нет")
+    for key in missingRu.prefix(8) { print("      · нет русского: \(key)") }
+
+    // Пустая строка в словаре — та же пропажа, только незаметная.
+    let empty = Array(L.ru.filter { $0.value.isEmpty }.keys) + Array(L.en.filter { $0.value.isEmpty }.keys)
+    check(empty.isEmpty, "пустых переводов нет")
+
+    // Подстановки должны совпадать: иначе String(format:) выдаст мусор.
+    var mismatched: [String] = []
+    for (key, russian) in L.ru {
+        guard let english = L.en[key] else { continue }
+        let ruSpec = russian.filter { $0 == "%" }.count
+        let enSpec = english.filter { $0 == "%" }.count
+        if ruSpec != enSpec { mismatched.append(key) }
+    }
+    check(mismatched.isEmpty, "подстановки совпадают в обоих языках")
+    for key in mismatched.prefix(6) { print("      · \(key)") }
+
+    // Переключение языка меняет строки и не роняет обращения.
+    L.language = .en
+    let englishPlay = L.t("studio.play")
+    L.language = .ru
+    let russianPlay = L.t("studio.play")
+    check(englishPlay != russianPlay, "язык переключается: \(englishPlay) / \(russianPlay)")
+    check(L.t("несуществующий.ключ") == "несуществующий.ключ", "пропавший ключ виден как есть")
+}
+
 print("")
 if failures == 0 {
     print("Все проверки пройдены.")

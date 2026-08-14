@@ -11,21 +11,8 @@ struct GuitarModel: Codable, Hashable, Sendable, Identifiable {
 
         var id: String { rawValue }
 
-        var title: String {
-            switch self {
-            case .classical: return "Классика"
-            case .acoustic:  return "Акустика"
-            case .electric:  return "Электро"
-            }
-        }
-
-        var subtitle: String {
-            switch self {
-            case .classical: return "нейлон, мягкая атака"
-            case .acoustic:  return "сталь, звонкий корпус"
-            case .electric:  return "звукосниматель, длинный сустейн"
-            }
-        }
+        var title: String { L.t("guitar." + rawValue) }
+        var subtitle: String { L.t("guitar." + rawValue + "Hint") }
     }
 
     var kind: Kind

@@ -17,14 +17,7 @@ enum AudioFileFormat: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var subtitle: String {
-        switch self {
-        case .m4a:  return "сжатый, компактный — чтобы отправить"
-        case .wav:  return "без потерь, 24 бита — для монтажа"
-        case .aiff: return "без потерь, для программ Apple"
-        case .caf:  return "без потерь, без ограничения длины"
-        }
-    }
+    var subtitle: String { L.t("format." + rawValue) }
 
     var isLossless: Bool { self != .m4a }
 

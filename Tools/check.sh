@@ -18,6 +18,7 @@ AUDIO_SOURCES=(
     Sources/GuitarKeys/Music/ChordLibrary.swift
     Sources/GuitarKeys/Input/Bindings.swift
     Sources/GuitarKeys/Input/KeyCodes.swift
+    Sources/GuitarKeys/Localization.swift
     Sources/GuitarKeys/UI/FretboardGeometry.swift
     Sources/GuitarKeys/Music/Song.swift
     Sources/GuitarKeys/Music/RhythmPattern.swift

@@ -22,7 +22,7 @@ struct StudioView: View {
 
             HStack(spacing: 8) {
                 Button { state.addBar() } label: {
-                    Label("Такт", systemImage: "plus")
+                    Label(L.t("studio.addBar"), systemImage: "plus")
                         .font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 10)
                         .frame(height: 30)
@@ -32,10 +32,10 @@ struct StudioView: View {
 
                 if !state.selectedBars.isEmpty {
                     HStack(spacing: 6) {
-                        Text("выделено: \(state.selectedBars.count)")
+                        Text(L.t("studio.selected", state.selectedBars.count))
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundStyle(Theme.accent)
-                        Button("снять") { state.clearSelection() }
+                        Button(L.t("studio.deselect")) { state.clearSelection() }
                             .buttonStyle(.glass)
                             .controlSize(.small)
                     }
@@ -61,7 +61,7 @@ struct StudioView: View {
                     Image(systemName: state.isSongPlaying ? "stop.fill" : "play.fill")
                         .font(.system(size: 13, weight: .semibold))
                     if !compact {
-                        Text(state.isSongPlaying ? "Стоп" : "Играть")
+                        Text(state.isSongPlaying ? L.t("studio.stop") : L.t("studio.play"))
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                     }
                 }
@@ -82,7 +82,7 @@ struct StudioView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.glass)
-            .help("Повторять по кругу (L)")
+            .help(L.t("studio.loop"))
 
             Button {
                 state.metronome.toggle()
@@ -94,14 +94,14 @@ struct StudioView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.glass)
-            .help("Метроном (M)")
+            .help(L.t("studio.metronome"))
 
-            stepper(value: "\(Int(state.song.bpm))", caption: "темп",
+            stepper(value: "\(Int(state.song.bpm))", caption: L.t("studio.tempo"),
                     minus: { state.song.bpm = max(40, state.song.bpm - 1) },
                     plus: { state.song.bpm = min(220, state.song.bpm + 1) })
 
             // Размер такта и дробление — сетка перестраивается на лету.
-            stepper(value: "\(state.song.beatsPerBar)/4", caption: "размер",
+            stepper(value: "\(state.song.beatsPerBar)/4", caption: L.t("studio.meter"),
                     minus: { state.setBeatsPerBar(state.song.beatsPerBar - 1) },
                     plus: { state.setBeatsPerBar(state.song.beatsPerBar + 1) })
 
@@ -114,7 +114,7 @@ struct StudioView: View {
                     Text(state.song.division.title)
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Theme.accent)
-                    Text("сетка").font(.system(size: 8)).foregroundStyle(.tertiary)
+                    Text(L.t("studio.grid")).font(.system(size: 8)).foregroundStyle(.tertiary)
                 }
                 .padding(.horizontal, 8)
                 .frame(height: 34)
@@ -141,7 +141,7 @@ struct StudioView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Theme.accent)
                     if !compact {
-                        Text("Ритм")
+                        Text(L.t("studio.rhythm"))
                             .font(.system(size: 12, weight: .medium, design: .rounded))
                     }
                 }
@@ -152,9 +152,7 @@ struct StudioView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             .glassEffect(.regular.interactive(), in: .capsule)
-            .help(state.selectedBars.isEmpty
-                  ? "Положить готовый бой во все такты"
-                  : "Положить бой в выделенные такты")
+            .help(state.selectedBars.isEmpty ? L.t("studio.rhythmAll") : L.t("studio.rhythmSelection"))
 
             if !compact {
                 Text(durationLabel)
@@ -171,10 +169,10 @@ struct StudioView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.glass)
-            .help("Сохранить проект")
+            .help(L.t("studio.save"))
 
             Menu {
-                Section("Свести в файл") {
+                Section(L.t("studio.exportSection")) {
                     ForEach(AudioFileFormat.allCases) { format in
                         Button("\(format.title) — \(format.subtitle)") {
                             state.exportSong(format: format)
@@ -190,7 +188,7 @@ struct StudioView: View {
                             .font(.system(size: 12, weight: .semibold))
                     }
                     if !compact {
-                        Text(state.isExporting ? "Сведение…" : "Свести")
+                        Text(state.isExporting ? L.t("studio.exporting") : L.t("studio.export"))
                             .font(.system(size: 12, weight: .medium, design: .rounded))
                     }
                 }
@@ -207,8 +205,7 @@ struct StudioView: View {
 
     private var durationLabel: String {
         let total = state.song.duration
-        return String(format: "%d такта · %d:%02d", state.song.bars.count,
-                      Int(total) / 60, Int(total) % 60)
+        return L.t("studio.duration", state.song.bars.count, Int(total) / 60, Int(total) % 60)
     }
 
     private func stepper(value: String, caption: String,
@@ -267,7 +264,7 @@ struct StudioView: View {
 
                     divider
 
-                    brushChip(.note, symbol: "number", label: "лад", hint: "5")
+                    brushChip(.note, symbol: "number", label: L.t("studio.fret"), hint: "5")
                     brushChip(.eraser, symbol: "eraser", hint: "6")
                 }
                 .padding(.vertical, 2)
@@ -275,7 +272,7 @@ struct StudioView: View {
 
             HStack(spacing: 10) {
                 if state.brush.isNote {
-                    stepper(value: "\(state.brushFret)", caption: "лад",
+                    stepper(value: "\(state.brushFret)", caption: L.t("studio.fret"),
                             minus: { state.brushFret = max(0, state.brushFret - 1) },
                             plus: { state.brushFret = min(24, state.brushFret + 1) })
                 }
@@ -295,12 +292,12 @@ struct StudioView: View {
                         .frame(width: 36, alignment: .trailing)
                 }
 
-                Toggle("табы", isOn: $state.showsTabs)
+                Toggle(L.t("studio.tabs"), isOn: $state.showsTabs)
                     .toggleStyle(.button)
                     .buttonStyle(.glass)
                     .controlSize(.small)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .help("Показать табулатуру (T)")
+                    .help(L.t("studio.tabsHelp"))
 
                 HStack(spacing: 4) {
                     Image(systemName: "minus.magnifyingglass")
@@ -311,7 +308,7 @@ struct StudioView: View {
                         .tint(Theme.accent)
                         .frame(maxWidth: 90)
                 }
-                .help("Масштаб таймлайна ([ ])")
+                .help(L.t("studio.zoom"))
 
                 Spacer(minLength: 0)
             }

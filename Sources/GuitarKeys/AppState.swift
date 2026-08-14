@@ -7,7 +7,7 @@ enum AppScreen: String, Hashable, CaseIterable, Identifiable, Sendable {
     case play, studio
 
     var id: String { rawValue }
-    var title: String { self == .play ? "Игра" : "Студия" }
+    var title: String { L.t("screen." + rawValue) }
     var symbolName: String { self == .play ? "guitars.fill" : "square.grid.3x2.fill" }
 }
 
@@ -48,6 +48,7 @@ final class AppState {
     var inspectorPad: Pad?
     var showsSettings = false
     var showsGuitarPicker = false
+    var showsAbout = false
     /// Окно развёрнуто на весь экран: кнопки окна прячутся, отступ под них не нужен.
     var isFullScreen = false
 
@@ -74,6 +75,7 @@ final class AppState {
         audio.volume = Float(prefs.volume)
         audio.humanize = prefs.humanize
         audio.model = prefs.guitar
+        L.language = prefs.language
         audio.start()
 
         #if os(macOS)
@@ -920,6 +922,15 @@ final class AppState {
         set {
             preferences.volume = newValue
             audio.volume = Float(newValue)
+        }
+    }
+
+    /// Язык интерфейса. Меняется без перезапуска.
+    var language: Language {
+        get { preferences.language }
+        set {
+            preferences.language = newValue
+            L.language = newValue
         }
     }
 

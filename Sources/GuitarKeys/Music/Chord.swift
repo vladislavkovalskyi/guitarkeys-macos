@@ -32,14 +32,7 @@ enum ChordQuality: String, Codable, CaseIterable, Hashable, Sendable {
 
         var id: String { rawValue }
 
-        var title: String {
-            switch self {
-            case .triads:    return "Простые"
-            case .sevenths:  return "Септаккорды"
-            case .suspended: return "Sus и квинты"
-            case .colour:    return "Сложные"
-            }
-        }
+        var title: String { L.t("chords." + rawValue) }
 
         var qualities: [ChordQuality] {
             switch self {
@@ -228,7 +221,7 @@ struct Voicing: Hashable, Sendable {
 enum ScaleType: String, Codable, CaseIterable, Sendable {
     case major, minor
 
-    var displayName: String { self == .major ? "мажор" : "минор" }
+    var displayName: String { L.t("scale." + rawValue) }
 
     /// Ступени лада в полутонах от тоники.
     var degrees: [Int] {

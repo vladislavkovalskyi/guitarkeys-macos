@@ -7,30 +7,30 @@ struct SettingsView: View {
         @Bindable var state = state
 
         VStack(alignment: .leading, spacing: 18) {
-            group("Звук") {
-                slider("Громкость", value: $state.volume, range: 0...1, symbol: "speaker.wave.2")
-                slider("Разброс боя",
+            group(L.t("settings.sound")) {
+                slider(L.t("settings.volume"), value: $state.volume, range: 0...1, symbol: "speaker.wave.2")
+                slider(L.t("settings.spread"),
                        value: $state.preferences.strumSpread,
                        range: 5...45,
                        symbol: "timelapse",
                        format: { "\(Int($0)) мс" })
-                slider("Живая рука", value: $state.humanize, range: 0...1, symbol: "hand.wave")
+                slider(L.t("settings.humanize"), value: $state.humanize, range: 0...1, symbol: "hand.wave")
             }
-            Text("Живая рука делает каждый удар чуть другим: сила, тайминг, строй и\u{00A0}место щипка. На нуле — механически ровно.")
+            Text(L.t("settings.humanizeHint"))
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, -8)
 
-            group("Игра") {
-                Toggle("Удар вниз при нажатии аккорда", isOn: $state.preferences.autoStrumOnPress)
-                Toggle("Глушить струны при отпускании", isOn: $state.preferences.muteOnRelease)
+            group(L.t("settings.playing")) {
+                Toggle(L.t("settings.autoStrum"), isOn: $state.preferences.autoStrumOnPress)
+                Toggle(L.t("settings.muteOnRelease"), isOn: $state.preferences.muteOnRelease)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
             .font(.system(size: 12))
 
-            group("Клавиши правой руки") {
+            group(L.t("settings.rightHandKeys")) {
                 ForEach(state.preferences.actions) { binding in
                     HStack {
                         Image(systemName: binding.action.symbolName)
@@ -45,7 +45,7 @@ struct SettingsView: View {
                             state.showsSettings = false
                         } label: {
                             Text(binding.keyCodes.isEmpty
-                                 ? "назначить"
+                                 ? L.t("settings.assign")
                                  : binding.keyCodes.map { KeyCodes.label(for: $0) }.joined(separator: " "))
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                                 .frame(minWidth: 44)
@@ -56,7 +56,7 @@ struct SettingsView: View {
                 }
             }
 
-            group("Формат записи") {
+            group(L.t("settings.recordFormat")) {
                 HStack(spacing: 5) {
                     ForEach(AudioFileFormat.allCases) { format in
                         let selected = state.preferences.recordingFormat == format
@@ -84,7 +84,7 @@ struct SettingsView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            group("Клавиши струн") {
+            group(L.t("settings.stringKeys")) {
                 HStack(spacing: 5) {
                     ForEach(0..<6, id: \.self) { number in
                         VStack(spacing: 3) {
@@ -104,20 +104,45 @@ struct SettingsView: View {
                         }
                     }
                 }
-                Text("Струна 1 — самая тонкая. По грифу можно бить и мышью: проводка через несколько струн играется как бой.")
+                Text(L.t("settings.stringKeysHint"))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            group(L.t("settings.language")) {
+                HStack(spacing: 5) {
+                    ForEach(Language.allCases) { language in
+                        let selected = state.language == language
+                        Button {
+                            withAnimation(.snappy(duration: 0.2)) { state.language = language }
+                        } label: {
+                            Text(language.title)
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(selected ? Color.black.opacity(0.82) : .primary)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 26)
+                                .background {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(selected ? AnyShapeStyle(Theme.accent)
+                                                       : AnyShapeStyle(.quaternary))
+                                }
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .focusEffectDisabled()
+                    }
+                }
+            }
+
             Divider().opacity(0.4)
 
             HStack {
-                Text("Правый клик по любой клавише — настроить аккорд.")
+                Text(L.t("settings.contextHint"))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                 Spacer()
-                Button("Сбросить") { state.resetBindings() }
+                Button(L.t("settings.reset")) { state.resetBindings() }
                     .buttonStyle(.glass)
                     .controlSize(.small)
             }

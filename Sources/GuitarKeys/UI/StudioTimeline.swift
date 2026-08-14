@@ -48,9 +48,9 @@ struct StudioTimeline: View {
 
     private func trackLabels(strumHeight: CGFloat, tabHeight: CGFloat) -> some View {
         VStack(alignment: .trailing, spacing: 4) {
-            label("такт", height: 16)
-            label("аккорд", height: 34)
-            label("бой", height: strumHeight)
+            label(L.t("studio.bar"), height: 16)
+            label(L.t("studio.chord"), height: 34)
+            label(L.t("studio.strumTrack"), height: strumHeight)
             if showsTabs {
                 VStack(spacing: 2) {
                     ForEach((0..<6).reversed(), id: \.self) { string in
@@ -92,7 +92,7 @@ struct StudioTimeline: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help("Выделить такт")
+                    .help(L.t("studio.selectBar"))
 
                     ForEach(1..<max(1, bar.slotCount), id: \.self) { slot in
                         // Щелчок по линейке ставит курсор — играть можно с любого места.
@@ -215,7 +215,7 @@ private struct ChordClip: View {
         Menu {
             // Ступени тональности идут первыми: ими пользуются чаще всего,
             // и они едут за сменой тональности.
-            Section("Ступень тональности") {
+            Section(L.t("studio.degreeSection")) {
                 ForEach(0..<7, id: \.self) { degree in
                     let triad = state.song.key.chord(degree: degree, seventh: false)
                     let seventh = state.song.key.chord(degree: degree, seventh: true)
@@ -229,7 +229,7 @@ private struct ChordClip: View {
             }
 
             // Любой из 252 аккордов: сначала тон, внутри — виды по группам.
-            Menu("Любой аккорд") {
+            Menu(L.t("studio.anyChord")) {
                 ForEach(0..<12, id: \.self) { tone in
                     Menu(Pitch.name(tone)) {
                         ForEach(ChordQuality.Family.allCases) { family in
@@ -248,7 +248,7 @@ private struct ChordClip: View {
 
             Divider()
 
-            Menu("Ритм такта") {
+            Menu(L.t("studio.barRhythm")) {
                 ForEach(RhythmPattern.Family.allCases) { family in
                     Section(family.title) {
                         ForEach(RhythmLibrary.patterns(in: family)) { pattern in
@@ -259,13 +259,13 @@ private struct ChordClip: View {
             }
 
             Divider()
-            Button("Копировать такт") { state.copyBar(at: index) }
+            Button(L.t("studio.copyBar")) { state.copyBar(at: index) }
             if state.copiedBar != nil {
-                Button("Вставить в этот такт") { state.pasteBar(at: index) }
+                Button(L.t("studio.pasteBar")) { state.pasteBar(at: index) }
             }
-            Button("Продублировать такт") { state.duplicateBar(at: index) }
-            Button("Очистить такт") { state.clearBar(at: index) }
-            Button("Удалить такт", role: .destructive) { state.removeBar(at: index) }
+            Button(L.t("studio.duplicateBar")) { state.duplicateBar(at: index) }
+            Button(L.t("studio.clearBar")) { state.clearBar(at: index) }
+            Button(L.t("studio.deleteBar"), role: .destructive) { state.removeBar(at: index) }
         } label: {
             Text(chordName)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -363,7 +363,7 @@ private struct StrumCell: View {
         .contentShape(Rectangle())
         .animation(.snappy(duration: 0.14), value: event)
         .gesture(gesture)
-        .help(event.map { "Сила \(Int($0.velocity * 100))%" } ?? "")
+        .help(event.map { L.t("studio.force", Int($0.velocity * 100)) } ?? "")
     }
 
     private var gesture: some Gesture {
@@ -485,10 +485,10 @@ private struct TabCell: View {
 
     private var helpText: String {
         let number = 6 - string
-        if isSilent { return "Струна \(number) в этом аккорде не звучит" }
-        if let pinned = pinnedFret { return "Струна \(number), лад \(pinned) — задан вручную" }
-        if let chord = chordFret { return "Струна \(number), лад \(chord) — из аккорда" }
-        return "Струна \(number)"
+        if isSilent { return L.t("studio.stringSilent", number) }
+        if let pinned = pinnedFret { return L.t("studio.fretManual", number, pinned) }
+        if let chord = chordFret { return L.t("studio.fretFromChord", number, chord) }
+        return L.t("studio.string", number)
     }
 
     private var gesture: some Gesture {

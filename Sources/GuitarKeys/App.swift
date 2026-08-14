@@ -22,54 +22,57 @@ struct GuitarKeysApp: App {
         .defaultSize(width: 900, height: 668)
         .commands {
             // Приложение — инструмент, а не редактор документов.
+            CommandGroup(replacing: .appInfo) {
+                Button(L.t("menu.about")) { state.showsAbout = true }
+            }
             CommandGroup(replacing: .newItem) {}
             CommandGroup(replacing: .undoRedo) {
-                Button("Отменить") { state.undo() }
+                Button(L.t("menu.undo")) { state.undo() }
                     .keyboardShortcut("z", modifiers: .command)
                     .disabled(!state.canUndo)
-                Button("Повторить") { state.redo() }
+                Button(L.t("menu.redo")) { state.redo() }
                     .keyboardShortcut("z", modifiers: [.command, .shift])
                     .disabled(!state.canRedo)
             }
             CommandGroup(replacing: .pasteboard) {}
 
-            CommandMenu("Игра") {
-                Button("Удар вниз") { state.strum(direction: .down, muted: false) }
-                Button("Удар вверх") { state.strum(direction: .up, muted: false) }
+            CommandMenu(L.t("menu.game")) {
+                Button(L.t("menu.strumDown")) { state.strum(direction: .down, muted: false) }
+                Button(L.t("menu.strumUp")) { state.strum(direction: .up, muted: false) }
                 Divider()
-                Button("Тональность выше") { state.transpose(by: 1) }
-                Button("Тональность ниже") { state.transpose(by: -1) }
+                Button(L.t("menu.keyUp")) { state.transpose(by: 1) }
+                Button(L.t("menu.keyDown")) { state.transpose(by: -1) }
                 Divider()
-                Button(state.isRecording ? "Остановить запись" : "Записать игру") {
+                Button(state.isRecording ? L.t("menu.recordStop") : L.t("menu.record")) {
                     state.toggleRecording()
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                Button("Папка с записями") { state.openRecordingsFolder() }
+                Button(L.t("play.recordingsFolder")) { state.openRecordingsFolder() }
                 Divider()
-                Button("Сбросить привязки") { state.resetBindings() }
+                Button(L.t("menu.resetBindings")) { state.resetBindings() }
             }
 
-            CommandMenu("Студия") {
-                Button("Играть или стоп") { state.toggleSongPlayback() }
+            CommandMenu(L.t("menu.studio")) {
+                Button(L.t("menu.playStop")) { state.toggleSongPlayback() }
                     .keyboardShortcut(.return, modifiers: [])
-                Button(state.metronome ? "Выключить метроном" : "Включить метроном") {
+                Button(state.metronome ? L.t("menu.metronomeOff") : L.t("menu.metronomeOn")) {
                     state.metronome.toggle()
                 }
                 .keyboardShortcut("m", modifiers: .command)
                 Divider()
-                Button("Выделить все такты") { state.selectAllBars() }
+                Button(L.t("menu.selectAll")) { state.selectAllBars() }
                     .keyboardShortcut("a", modifiers: .command)
-                Button("Снять выделение") { state.clearSelection() }
-                Button("Продублировать") { state.duplicateSelectedBars() }
+                Button(L.t("menu.deselect")) { state.clearSelection() }
+                Button(L.t("menu.duplicate")) { state.duplicateSelectedBars() }
                     .keyboardShortcut("d", modifiers: .command)
-                Button("Очистить такты") { state.clearSelectedBars() }
+                Button(L.t("menu.clearBars")) { state.clearSelectedBars() }
                     .keyboardShortcut(.delete, modifiers: [])
-                Button("Удалить такты") { state.removeSelectedBars() }
+                Button(L.t("menu.deleteBars")) { state.removeSelectedBars() }
                     .keyboardShortcut(.delete, modifiers: .command)
                 Divider()
-                Button("Сохранить проект") { state.saveSongProject() }
+                Button(L.t("studio.save")) { state.saveSongProject() }
                     .keyboardShortcut("s", modifiers: .command)
-                Menu("Свести в файл") {
+                Menu(L.t("studio.exportSection")) {
                     ForEach(AudioFileFormat.allCases) { format in
                         Button(format.title) { state.exportSong(format: format) }
                     }
