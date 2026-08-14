@@ -30,6 +30,18 @@ struct StudioView: View {
                 }
                 .buttonStyle(.glass)
 
+                if !state.selectedBars.isEmpty {
+                    HStack(spacing: 6) {
+                        Text("выделено: \(state.selectedBars.count)")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(Theme.accent)
+                        Button("снять") { state.clearSelection() }
+                            .buttonStyle(.glass)
+                            .controlSize(.small)
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                }
+
                 if !compact { shortcutHints }
                 Spacer(minLength: 0)
             }
@@ -72,6 +84,18 @@ struct StudioView: View {
             .buttonStyle(.glass)
             .help("Повторять по кругу (L)")
 
+            Button {
+                state.metronome.toggle()
+            } label: {
+                Image(systemName: "metronome")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(state.metronome ? Theme.accent : .secondary)
+                    .frame(width: 34, height: 34)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.glass)
+            .help("Метроном (M)")
+
             stepper(value: "\(Int(state.song.bpm))", caption: "темп",
                     minus: { state.song.bpm = max(40, state.song.bpm - 1) },
                     plus: { state.song.bpm = min(220, state.song.bpm + 1) })
@@ -106,7 +130,7 @@ struct StudioView: View {
                     Section(family.title) {
                         ForEach(RhythmLibrary.patterns(in: family)) { pattern in
                             Button("\(pattern.name) — \(pattern.subtitle)") {
-                                state.applyPatternToAll(pattern)
+                                state.applyPatternToSelection(pattern)
                             }
                         }
                     }
@@ -128,7 +152,9 @@ struct StudioView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             .glassEffect(.regular.interactive(), in: .capsule)
-            .help("Положить готовый бой во все такты")
+            .help(state.selectedBars.isEmpty
+                  ? "Положить готовый бой во все такты"
+                  : "Положить бой в выделенные такты")
 
             if !compact {
                 Text(durationLabel)
@@ -232,10 +258,11 @@ struct StudioView: View {
                     brushChip(.strum(direction: .down, muted: true), symbol: "arrow.down.to.line", hint: "3")
                     brushChip(.strum(direction: .up, muted: true), symbol: "arrow.up.to.line", hint: "4")
 
-                    divider
-
-                    ForEach(1...6, id: \.self) { number in
-                        brushChip(.pluck(string: 6 - number), symbol: nil, label: "\(number)")
+                    if !state.showsTabs {
+                        divider
+                        ForEach(1...6, id: \.self) { number in
+                            brushChip(.pluck(string: 6 - number), symbol: nil, label: "\(number)")
+                        }
                     }
 
                     divider

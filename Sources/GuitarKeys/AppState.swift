@@ -473,6 +473,8 @@ final class AppState {
     var brushVelocity: Double = 1.0
     var brushFret: Int = 0
     var showsTabs = true
+    /// Выделенные такты: ритм и правки применяются сразу ко всем.
+    var selectedBars: Set<UUID> = []
     /// Ширина одного деления таймлайна — она же зум.
     var timelineZoom: Double = 30
 
@@ -505,6 +507,8 @@ final class AppState {
         case KeyCodes.six:   brush = .eraser
         case KeyCodes.l:     player.loops.toggle()
         case KeyCodes.t:     showsTabs.toggle()
+        case KeyCodes.m:     metronome.toggle()
+        case KeyCodes.escape: clearSelection()
         case KeyCodes.n:     addBar()
         case KeyCodes.leftBracket:  zoom(by: -4)
         case KeyCodes.rightBracket: zoom(by: +4)
@@ -529,6 +533,7 @@ final class AppState {
         ("←→", "сила кисти"),
         ("↑↓", "номер лада"),
         ("T", "табы"),
+        ("M", "метроном"),
         ("L", "повтор"),
         ("N", "новый такт"),
         (", .", "темп"),
@@ -548,7 +553,71 @@ final class AppState {
     var isSongPlaying: Bool { player.isPlaying }
 
     func toggleSongPlayback() {
-        player.toggle(song, model: songModel)
+        player.isPlaying ? player.stop() : player.play(song, model: songModel)
+    }
+
+    /// Играть с нужной доли — курсор ставится щелчком по линейке.
+    func playFrom(slot: Int) {
+        player.play(song, model: songModel, fromSlot: slot)
+    }
+
+    var metronome: Bool {
+        get { player.metronome }
+        set { player.metronome = newValue }
+    }
+
+    // MARK: Выделение тактов
+
+    func toggleSelection(_ id: UUID, extend: Bool) {
+        if extend {
+            if selectedBars.contains(id) { selectedBars.remove(id) } else { selectedBars.insert(id) }
+        } else {
+            selectedBars = selectedBars == [id] ? [] : [id]
+        }
+    }
+
+    func selectAllBars() { selectedBars = Set(song.bars.map(\.id)) }
+    func clearSelection() { selectedBars.removeAll() }
+
+    /// Индексы выделенного, а если ничего не выбрано — весь проект.
+    private func targetBarIndices() -> [Int] {
+        let indices = song.bars.indices.filter { selectedBars.contains(song.bars[$0].id) }
+        return indices.isEmpty ? Array(song.bars.indices) : indices
+    }
+
+    /// Ритм ложится в выделенные такты, а без выделения — во все.
+    func applyPatternToSelection(_ pattern: RhythmPattern) {
+        guard !song.bars.isEmpty else { return }
+        pushUndo()
+        adoptGrid(of: pattern)
+        let slots = fitted(pattern)
+        for index in targetBarIndices() {
+            song.bars[index].slots = slots
+        }
+    }
+
+    func clearSelectedBars() {
+        pushUndo()
+        for index in targetBarIndices() {
+            song.bars[index].slots = Array(repeating: [], count: song.slotsPerBar)
+        }
+    }
+
+    func removeSelectedBars() {
+        let doomed = selectedBars
+        guard !doomed.isEmpty, song.bars.count > doomed.count else { return }
+        pushUndo()
+        song.bars.removeAll { doomed.contains($0.id) }
+        selectedBars.removeAll()
+    }
+
+    func duplicateSelectedBars() {
+        pushUndo()
+        for index in targetBarIndices().reversed() {
+            var copy = song.bars[index]
+            copy.id = UUID()
+            song.bars.insert(copy, at: index + 1)
+        }
     }
 
     func stopSongPlayback() {

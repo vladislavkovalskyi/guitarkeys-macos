@@ -14,6 +14,8 @@ final class SongPlayer {
     /// Доля под курсором воспроизведения, −1 если стоим.
     private(set) var currentSlot: Int = -1
     var loops = true
+    /// Счёт вслух: без него сочинять ритм приходится вслепую.
+    var metronome = false
 
     private let audio: AudioEngine
     private var events: [StringEvent] = []
@@ -29,7 +31,7 @@ final class SongPlayer {
         self.audio = audio
     }
 
-    func play(_ song: Song, model: GuitarModel) {
+    func play(_ song: Song, model: GuitarModel, fromSlot: Int = 0) {
         stop()
         guard !song.bars.isEmpty else { return }
 
@@ -39,14 +41,21 @@ final class SongPlayer {
         slotSamples = song.slotDuration * sampleRate
         startSample = audio.currentSample &+ audio.scheduleLead &+ UInt64(0.05 * sampleRate)
 
+        // Перемотка: сдвигаем начало отсчёта назад, чтобы нужная доля пришлась на сейчас.
+        let offset = UInt64(Double(max(0, fromSlot)) * slotSamples)
+        startSample = startSample >= offset ? startSample &- offset : startSample
+
         events = SongRenderer.events(for: song, model: model,
                                      sampleRate: sampleRate, startSample: startSample)
+            .filter { $0.atSample >= audio.currentSample }
+        if metronome { events += clicks(for: song, sampleRate: sampleRate) }
+        events.sort { $0.atSample < $1.atSample }
         guard !events.isEmpty else { return }
 
         pending = 0
         totalSamples = UInt64(Double(song.totalSlots) * slotSamples)
         isPlaying = true
-        currentSlot = 0
+        currentSlot = max(0, fromSlot)
 
         let ticker = Timer(timeInterval: 0.03, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
@@ -72,6 +81,25 @@ final class SongPlayer {
 
     func toggle(_ song: Song, model: GuitarModel) {
         isPlaying ? stop() : play(song, model: model)
+    }
+
+    /// Щелчки на каждую долю; первая в такте — акцент.
+    private func clicks(for song: Song, sampleRate: Double) -> [StringEvent] {
+        var result: [StringEvent] = []
+        var slot = 0
+        for bar in song.bars {
+            for index in 0..<bar.slotCount where index % song.division.perBeat == 0 {
+                var event = StringEvent()
+                event.atSample = startSample &+ UInt64(Double(slot + index) * slotSamples)
+                event.kind = .click
+                let accent = index == 0
+                event.frequency = accent ? 1600 : 1050
+                event.velocity = accent ? 0.5 : 0.3
+                result.append(event)
+            }
+            slot += bar.slotCount
+        }
+        return result.filter { $0.atSample >= audio.currentSample }
     }
 
     private func tick() {

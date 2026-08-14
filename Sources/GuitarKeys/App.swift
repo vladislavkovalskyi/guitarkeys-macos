@@ -48,6 +48,33 @@ struct GuitarKeysApp: App {
                 Divider()
                 Button("Сбросить привязки") { state.resetBindings() }
             }
+
+            CommandMenu("Студия") {
+                Button("Играть или стоп") { state.toggleSongPlayback() }
+                    .keyboardShortcut(.return, modifiers: [])
+                Button(state.metronome ? "Выключить метроном" : "Включить метроном") {
+                    state.metronome.toggle()
+                }
+                .keyboardShortcut("m", modifiers: .command)
+                Divider()
+                Button("Выделить все такты") { state.selectAllBars() }
+                    .keyboardShortcut("a", modifiers: .command)
+                Button("Снять выделение") { state.clearSelection() }
+                Button("Продублировать") { state.duplicateSelectedBars() }
+                    .keyboardShortcut("d", modifiers: .command)
+                Button("Очистить такты") { state.clearSelectedBars() }
+                    .keyboardShortcut(.delete, modifiers: [])
+                Button("Удалить такты") { state.removeSelectedBars() }
+                    .keyboardShortcut(.delete, modifiers: .command)
+                Divider()
+                Button("Сохранить проект") { state.saveSongProject() }
+                    .keyboardShortcut("s", modifiers: .command)
+                Menu("Свести в файл") {
+                    ForEach(AudioFileFormat.allCases) { format in
+                        Button(format.title) { state.exportSong(format: format) }
+                    }
+                }
+            }
         }
         #else
         WindowGroup {

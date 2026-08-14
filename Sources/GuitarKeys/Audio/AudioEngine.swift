@@ -182,6 +182,16 @@ final class AudioEngine: @unchecked Sendable {
         }
     }
 
+    /// Щелчок метронома. Сильная доля выше и громче — счёт слышно без разглядывания.
+    func click(at sample: UInt64, accent: Bool) {
+        var event = StringEvent()
+        event.atSample = sample
+        event.kind = .click
+        event.frequency = accent ? 1600 : 1050
+        event.velocity = accent ? 0.5 : 0.3
+        synth.queue.push(event)
+    }
+
     /// Поставить готовое событие в очередь: студия рассчитывает время сама.
     func queue(_ event: StringEvent) {
         synth.queue.push(event)

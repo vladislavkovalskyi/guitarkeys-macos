@@ -7,6 +7,7 @@ struct StringEvent {
         case pluck   = 0  // удар по струне
         case damp    = 1  // приглушить струну (отпустили аккорд)
         case silence = 2  // мгновенно оборвать
+        case click   = 3  // щелчок метронома
     }
 
     var atSample: UInt64 = 0

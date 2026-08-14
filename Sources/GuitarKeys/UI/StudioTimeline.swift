@@ -75,16 +75,37 @@ struct StudioTimeline: View {
         HStack(spacing: 0) {
             ForEach(Array(song.bars.enumerated()), id: \.element.id) { index, bar in
                 HStack(spacing: 0) {
-                    Text("\(index + 1)")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .frame(width: cellWidth, alignment: .leading)
+                    // Номер такта выделяет его; ⇧ и ⌘ добавляют к выделению.
+                    Button {
+                        state.toggleSelection(bar.id, extend: false)
+                    } label: {
+                        Text("\(index + 1)")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundStyle(state.selectedBars.contains(bar.id)
+                                             ? Color.black.opacity(0.85) : .secondary)
+                            .frame(width: cellWidth, height: 16)
+                            .background {
+                                if state.selectedBars.contains(bar.id) {
+                                    Capsule().fill(Theme.accent)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Выделить такт")
+
                     ForEach(1..<max(1, bar.slotCount), id: \.self) { slot in
-                        // Точками отмечены сильные доли — по ним считается ритм.
-                        Text(song.isDownbeat(slot) ? "·" : "")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.quaternary)
-                            .frame(width: cellWidth)
+                        // Щелчок по линейке ставит курсор — играть можно с любого места.
+                        Button {
+                            state.playFrom(slot: song.absoluteSlot(bar: index, slot: slot))
+                        } label: {
+                            Text(song.isDownbeat(slot) ? "·" : "")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.quaternary)
+                                .frame(width: cellWidth, height: 16)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .overlay(alignment: .leading) {
@@ -188,6 +209,7 @@ private struct ChordClip: View {
     @UIState private var isDropTarget = false
 
     private var chordName: String { state.song.chord(inBar: index)?.name ?? "—" }
+    private var isSelected: Bool { state.selectedBars.contains(bar.id) }
 
     var body: some View {
         Menu {
@@ -253,13 +275,15 @@ private struct ChordClip: View {
                 .frame(width: max(30, width), height: 30)
                 .background {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Theme.accent.opacity(0.16))
+                        .fill(Theme.accent.opacity(isSelected ? 0.34 : 0.16))
                         .overlay {
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(isDropTarget ? Theme.accent : Theme.accent.opacity(0.35),
-                                              lineWidth: isDropTarget ? 2 : 1)
+                                .strokeBorder(isDropTarget ? Theme.accent
+                                              : Theme.accent.opacity(isSelected ? 0.9 : 0.35),
+                                              lineWidth: isDropTarget || isSelected ? 2 : 1)
                         }
                 }
+                .animation(.snappy(duration: 0.18), value: isSelected)
         }
         .menuStyle(.borderlessButton)
         // Ширину задаёт такт, поэтому fixedSize здесь нельзя: он сжал бы клип
@@ -321,9 +345,11 @@ private struct StrumCell: View {
                     .padding(.bottom, 5)
             }
 
-            if isBarStart {
+            if isBarStart || isDownbeat {
                 HStack {
-                    Rectangle().fill(Color.white.opacity(0.22)).frame(width: 1)
+                    Rectangle()
+                        .fill(Color.white.opacity(isBarStart ? 0.3 : 0.12))
+                        .frame(width: isBarStart ? 1.5 : 1)
                     Spacer()
                 }
             }

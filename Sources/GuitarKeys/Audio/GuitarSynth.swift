@@ -48,6 +48,12 @@ final class GuitarSynth: @unchecked Sendable {
 
     private var rngState: UInt32 = 0x9E3779B9
 
+    // Метроном: отдельный голос, струнами щелчок не сыграть.
+    private var clickPhase: Float = 0
+    private var clickStep: Float = 0
+    private var clickLevel: Float = 0
+    private var clickDecay: Float = 0.9995
+
     // Состояние выходного фильтра постоянной составляющей.
     private var dcL: Float = 0, dcPrevL: Float = 0
     private var dcR: Float = 0, dcPrevR: Float = 0
@@ -189,7 +195,14 @@ final class GuitarSynth: @unchecked Sendable {
         // Фильтр постоянной составляющей — на выходе, а не в петле обратной связи:
         // в петле он расстроил бы низкие струны.
         for i in from..<to {
-            let inL = left[i], inR = right[i]
+            var click: Float = 0
+            if clickLevel > 0.0001 {
+                click = sin(clickPhase) * clickLevel * 0.5
+                clickPhase += clickStep
+                if clickPhase > 2 * Float.pi { clickPhase -= 2 * Float.pi }
+                clickLevel *= clickDecay
+            }
+            let inL = left[i] + click, inR = right[i] + click
             dcL = inL - dcPrevL + 0.995 * dcL
             dcPrevL = inL
             dcR = inR - dcPrevR + 0.995 * dcR
@@ -248,12 +261,17 @@ final class GuitarSynth: @unchecked Sendable {
     }
 
     private func apply(_ event: StringEvent) {
+        if event.kind == .click {
+            startClick(frequency: event.frequency, velocity: event.velocity)
+            return
+        }
         let s = Int(event.string)
         guard s >= 0 && s < Self.stringCount else { return }
         switch event.kind {
         case .pluck:   pluck(string: s, event: event)
         case .damp:    damp(string: s, sustain: max(0.03, event.sustain))
         case .silence: silence(string: s)
+        case .click:   startClick(frequency: event.frequency, velocity: event.velocity)
         }
     }
 
@@ -369,6 +387,15 @@ final class GuitarSynth: @unchecked Sendable {
         guard voices[s].active else { return }
         voices[s].decay = decayFactor(period: voices[s].period, sustain: sustain)
         voices[s].lpCoef = min(0.75, voices[s].lpCoef + 0.25)
+    }
+
+    /// Короткий затухающий тон: слышно сквозь гитару и не мешает ей.
+    private func startClick(frequency: Float, velocity: Float) {
+        clickStep = 2 * Float.pi * max(200, min(4000, frequency)) / sampleRate
+        clickPhase = 0
+        clickLevel = max(0, min(1, velocity))
+        // Спад примерно за 40 мс.
+        clickDecay = exp(-1.0 / (0.04 * sampleRate))
     }
 
     private func silence(string s: Int) {
